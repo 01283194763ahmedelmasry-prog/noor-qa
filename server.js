@@ -19,7 +19,7 @@ const FATWA_TOPICS = ['طلاق', 'طلقت', 'مطلقة', 'ميراث', 'ور�
 const FATWA_MSG = 'هذا السؤال يتعلق بحالة شخصية تحتاج فتوى من عالم مؤهل يسمع تفاصيلها. التطبيق يعرض النصوص الموثقة من القرآن والسنة فقط ولا يُفتي في الحالات الشخصية.';
 
 const body = (req) => new Promise((resolve, reject) => { let b = '', n = 0, dead = false;
-  req.on('data', (c) => { n += c.length; if (n > 1e6) { dead = true; reject(Object.assign(new Error('too_large'), { code: 413 })); req.destroy(); } else b += c; });
+  req.on('data', (c) => { n += c.length; if (n > 8e6) { dead = true; reject(Object.assign(new Error('too_large'), { code: 413 })); req.destroy(); } else b += c; });
   req.on('end', () => { if (dead) return; try { const v = JSON.parse(b || '{}'); resolve(v && typeof v === 'object' && !Array.isArray(v) ? v : {}); } catch { reject(Object.assign(new Error('bad_json'), { code: 400 })); } });
   req.on('error', () => { if (!dead) reject(Object.assign(new Error('bad_request'), { code: 400 })); }); });
 process.on('uncaughtException', (e) => console.error('uncaughtException', e));
@@ -205,6 +205,15 @@ http.createServer(async (req, res) => {
         else info.generate_err = (await r.text()).slice(0, 200);
       } catch (e) { info.generate_err = String(e.message); }
       return send(res, 200, info);
+    }
+    if (u.pathname === '/api/admin/load' && req.method === 'POST') {
+      const b = await body(req);
+      if (!ADMIN || b.token !== ADMIN) return send(res, 403, { error: 'forbidden' });
+      const tbl = b.kind === 'hadiths' ? 'qa_hadiths' : 'qa_ayahs';
+      const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 200).map((r) => ({ ...r, embedding: JSON.stringify(r.embedding) }));
+      const r = await sb('/rest/v1/' + tbl, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(rows) });
+      if (!r.ok) { console.log('load', r.status, (await r.text()).slice(0, 300)); return send(res, 500, { error: 'load_failed ' + r.status }); }
+      return send(res, 200, { loaded: rows.length });
     }
     if (u.pathname === '/api/admin/status' && req.method === 'POST') {
       const b = await body(req);
