@@ -84,9 +84,35 @@ function rank(ix, qt, k, minFrac) {
   const arr = [...sc].map(([d, s]) => [d, s * (0.4 + 0.6 * Math.min(1, (hit.get(d) / tot) * 2.2)), hit.get(d) / tot]).sort((a, b) => b[1] - a[1]);
   return arr.slice(0, k);
 }
-export function searchLocal(D, q, kw, ka = 8, kh = 8, minFrac = 0.34) {
+const FILL = new Set(['عايز', 'عاوز', 'اعرف', 'ممكن', 'سمحت', 'اشرح', 'اشرحلي', 'قولي', 'بالتفصيل', 'نصيحه', 'رايك', 'كلام', 'موضوع', 'سوال', 'ابغي', 'اريد', 'احتاج', 'محتاج', 'عندي', 'مشكله', 'اسال', 'اسأل', 'معلومات', 'تفاصيل', 'بخصوص', 'عن', 'الاسلام', 'اسلام', 'شرعا', 'شرعي', 'الشرع', 'الشريعه', 'الدين', 'الاسلاميه', 'مسلم', 'القران', 'السنه', 'الاحاديث', 'حديث', 'ايه', 'اية', 'آية', 'الايات', 'ايات', 'دليل'].map((x) => stem(norm(x))));
+// Modern / out-of-scope / ambiguous concepts: the corpus has a same-spelled word with a different meaning, so answer nothing.
+const OUT = new Set(['سحر', 'سحره', 'ساحر', 'تامين', 'تامينات', 'بيتكوين', 'بتكوين', 'كريبتو', 'اسهم', 'بورصه', 'فوركس', 'تداول', 'تبرع', 'اسم', 'مرحبا', 'اهلا', 'هلا', 'شكرا', 'تمام', 'اوكي', 'موسيقي', 'اغاني', 'غناء', 'تصوير', 'فيديو', 'انترنت', 'فيس', 'فيسبوك', 'يوتيوب', 'تجميل', 'جراحه', 'تطعيم', 'لقاح', 'يانصيب', 'قمار', 'سياره', 'موبايل', 'كمبيوتر', 'برمجه', 'لعبه', 'العاب', 'كره', 'ماتش', 'بنك', 'بنوك', 'قهوه', 'شاي', 'تدخين', 'سيجاره', 'شيشه'].map((x) => stem(norm(x))));
+const OUT_PH = ['النوم بعد الفجر', 'النوم بعد صلاه الفجر', 'نوم بعد الفجر'];
+export function searchLocal(D, q, kw, ka = 8, kh = 8, minFrac = 0.34, strict = false) {
   const qt = queryTerms(q, kw);
   if (!qt.size) return { ayahs: [], hadiths: [] };
+  if (strict) {
+    // Fail-safe: a question about something the corpus does not contain yields no text, and every
+    // returned text must contain the question's rarest (most distinctive) term.
+    const qs = [...toks(q)].filter((t) => !FILL.has(t) && qt.get(t) === 1);
+    const known = qs.filter((t) => D.hix.post.has(t) || D.aix.post.has(t));
+    if (!qs.length || qs.some((t) => t.length >= 4 && !known.includes(t))) return { ayahs: [], hadiths: [] };
+    const df = (t) => (D.hix.post.get(t)?.length || 0) / D.hix.n + (D.aix.post.get(t)?.length || 0) / D.aix.n;
+    const must = [...known].sort((a, b) => df(a) - df(b))[0];
+    const hasH = new Set((D.hix.post.get(must) || []).map((x) => x[0])), hasA = new Set((D.aix.post.get(must) || []).map((x) => x[0]));
+    if (qs.some((t) => OUT.has(t)) || OUT.has(norm(q)) || OUT_PH.some((p) => norm(q).includes(p))) return { ayahs: [], hadiths: [] };
+    const multi = known.length >= 2;
+    const titleHas = (d) => toks(D.H[D.hids[d]][2], true).includes(must);
+    const ayHas = (d) => toks(D.A[d][4], true).includes(must) || toks(D.A[d][2], true).includes(must);
+    const near = (d) => { // all question terms inside one window of 25 words of title+text (proximity = same topic)
+      if (known.length < 2) return true;
+      const h = D.H[D.hids[d]], tk = toks(h[2] + ' ' + (h[3] || h[4]), true), need = new Set(known);
+      const pos = []; tk.forEach((t, i) => { if (need.has(t)) pos.push([i, t]); });
+      for (let a = 0; a < pos.length; a++) { const seen = new Set(); for (let b = a; b < pos.length && pos[b][0] - pos[a][0] <= 25; b++) seen.add(pos[b][1]); if (seen.size === need.size) return true; }
+      return false; };
+    const hr = rank(D.hix, qt, 80, 1).filter((x) => x[2] >= minFrac && hasH.has(x[0]) && near(x[0]) && ((titleHas(x[0]) && x[2] >= minFrac) || (multi && x[2] >= 0.99 && (D.H[D.hids[x[0]]][3] || D.H[D.hids[x[0]]][4] || '').length < 500))).slice(0, 5), ar = rank(D.aix, qt, 80, 1).filter((x) => x[2] >= minFrac && hasA.has(x[0]) && ayHas(x[0]) && x[2] >= 0.99).slice(0, 4);
+    return { hadiths: hr.map(([d, s]) => ({ id: D.hids[d], score: s })), ayahs: ar.map(([d, s]) => ({ id: D.A[d][0], score: s })) };
+  }
   const hr = rank(D.hix, qt, kh, 1).filter((x) => x[2] >= minFrac), ar = rank(D.aix, qt, ka, 1).filter((x) => x[2] >= minFrac);
   const hTop = hr.length ? hr[0][1] : 0, aTop = ar.length ? ar[0][1] : 0;
   return {
@@ -96,7 +122,7 @@ export function searchLocal(D, q, kw, ka = 8, kh = 8, minFrac = 0.34) {
 }
 
 // ---------------- curated topics ----------------
-const WEAK = new Set(['الله', 'ربنا', 'عمل', 'العمل', 'هم', 'الهم', 'الام', 'الاب', 'امي', 'ابي', 'الحرام', 'الحلال', 'الكلام', 'الكلمه', 'النساء', 'المراه', 'الزوج', 'الزوجه', 'الرسول', 'رسول الله', 'محمد', 'الاخره', 'الاجل', 'الغني', 'الرضا', 'الحمد', 'نعمه', 'الحكم', 'الدين', 'دين', 'السفر', 'المسافر', 'الطريق', 'المعروف', 'القبر', 'الموت', 'السر', 'الوقت', 'العمر', 'الايام', 'الرزق', 'رزق', 'الدنيا', 'علم', 'العلم', 'الاكل', 'اكل', 'شرب', 'الشرب', 'نوم', 'النوم', 'الطعام', 'المسجد', 'الجار', 'جار', 'الضيف', 'ضيف', 'الاسلام', 'الايمان', 'اركان', 'المرض', 'مرض', 'الفقر', 'فقر', 'الحكم', 'السنه', 'الصحه', 'خلق', 'الاخلاق', 'الادب', 'السلوك', 'اولاد', 'الاولاد', 'الطفل', 'الاطفال', 'البصر', 'النظر', 'الزينه', 'عمره', 'ملابس', 'الاقارب', 'الصديق', 'صديق', 'السلام', 'سلام', 'الجمع', 'الفطر', 'الفجر', 'الصبح', 'صبح', 'قدر', 'القدر', 'الحج', 'حج', 'شكر', 'الشكر', 'عهد', 'العهد', 'وعد', 'الوعد', 'ذكر', 'الذكر', 'الكسب', 'الغش', 'غش', 'الظلم', 'ظلم', 'الصدق', 'صدق', 'كذب', 'الكذب', 'نار', 'النار', 'جنه', 'الجنه', 'عذاب', 'الاحسان', 'العدل', 'عدل', 'الحيوان', 'حيوان', 'الذبح', 'ذبح', 'النهار', 'العيد', 'عيد', 'الابتلاء', 'البلاء', 'الدوره', 'الشباب', 'الحشر', 'الحساب', 'البعث', 'الامير', 'السلطان', 'الخوف', 'تربيه', 'تربية']);
+const WEAK = new Set(['الله', 'ربنا', 'عمل', 'العمل', 'هم', 'الهم', 'الام', 'الاب', 'امي', 'ابي', 'الحرام', 'الحلال', 'الكلام', 'الكلمه', 'النساء', 'المراه', 'الزوج', 'الزوجه', 'الرسول', 'رسول الله', 'محمد', 'الاخره', 'الاجل', 'الغني', 'الرضا', 'الحمد', 'نعمه', 'الحكم', 'الدين', 'دين', 'السفر', 'المسافر', 'الطريق', 'المعروف', 'القبر', 'الموت', 'السر', 'الوقت', 'العمر', 'الايام', 'الرزق', 'رزق', 'الدنيا', 'علم', 'العلم', 'الاكل', 'اكل', 'شرب', 'الشرب', 'نوم', 'النوم', 'الطعام', 'المسجد', 'الجار', 'جار', 'الضيف', 'ضيف', 'الاسلام', 'الايمان', 'اركان', 'المرض', 'مرض', 'الفقر', 'فقر', 'الحكم', 'السنه', 'الصحه', 'خلق', 'الاخلاق', 'الادب', 'السلوك', 'اولاد', 'الاولاد', 'الطفل', 'الاطفال', 'البصر', 'النظر', 'الزينه', 'عمره', 'ملابس', 'الاقارب', 'الصديق', 'صديق', 'السلام', 'سلام', 'الجمع', 'الفطر', 'الفجر', 'الصبح', 'صبح', 'قدر', 'القدر', 'الحج', 'حج', 'شكر', 'الشكر', 'عهد', 'العهد', 'وعد', 'الوعد', 'ذكر', 'الذكر', 'الكسب', 'الغش', 'غش', 'الظلم', 'ظلم', 'الصدق', 'صدق', 'كذب', 'الكذب', 'نار', 'النار', 'جنه', 'الجنه', 'عذاب', 'الاحسان', 'العدل', 'عدل', 'الحيوان', 'حيوان', 'الذبح', 'ذبح', 'النهار', 'العيد', 'عيد', 'الابتلاء', 'البلاء', 'الدوره', 'الشباب', 'الحشر', 'الحساب', 'البعث', 'الامير', 'السلطان', 'الخوف', 'تربيه', 'تربية', 'مكتوب', 'المكتوب', 'قدر']);
 const nTrig = (s) => norm(s);
 export function loadTopics(dir = 'data') {
   const T = readJ(dir, 'topics.json');
@@ -107,11 +133,12 @@ export function loadTopics(dir = 'data') {
   return T;
 }
 const variants = (w) => { const v = new Set([w]); for (const sx of ['ي', 'ك', 'ها', 'ه', 'نا']) if (w.endsWith(sx) && w.length - sx.length >= 3) v.add(w.slice(0, -sx.length)); const base = [...v]; for (const b of base) for (const p of ['وال', 'بال', 'فال', 'كال', 'لل', 'ال', 'و', 'ب', 'ل']) if (b.startsWith(p) && b.length - p.length >= 2) v.add(b.slice(p.length)); return [...v]; };
-const GENQ = new Set(['فضل', 'حكم', 'معني', 'ماهو', 'ماهي', 'اهميه', 'ماذا', 'كيف', 'لماذا', 'هل', 'اريد', 'عايز', 'ايه', 'ازاي', 'قيمه', 'جائز', 'يجوز', 'دليل', 'اية', 'حديث', 'وصف', 'حرمه']);
+const GENQ = new Set(['فضل', 'حكم', 'معني', 'ماهو', 'ماهي', 'اهميه', 'ماذا', 'كيف', 'لماذا', 'هل', 'اريد', 'عايز', 'ايه', 'ازاي', 'قيمه', 'جائز', 'يجوز', 'دليل', 'اية', 'حديث', 'وصف', 'حرمه', 'كيفيه', 'الكيفيه', 'خطوات', 'مكتوبه', 'المكتوبه', 'اعرف', 'ممكن', 'سمحت', 'لو', 'عن', 'ان', 'بتاع', 'بتاعه']);
+const BOIL = new Set(['علامات', 'ثواب', 'اجر', 'فوائد', 'مفهوم', 'تعريف', 'انواع', 'احكام', 'شروط', 'اسباب', 'قصه', 'اهميه', 'خطوات', 'يوم', 'حقيقه', 'ربنا', 'الله', 'ايمان', 'الايمان', 'للرجل', 'للرجال', 'للمراه', 'للنساء', 'يجوز', 'ينفع', 'لازم', 'صح', 'صحيح', 'نفسي', 'اعمل', 'ايه', 'الاسلام', 'اسلام', 'القران', 'السنه', 'الاحاديث', 'احاديث', 'الايات', 'ايات', 'تقولي', 'قولي', 'اشرح', 'شرعا', 'الشرع', 'عايز', 'عاوز', 'ممكن', 'اعرف', 'سمحت', 'الكريم', 'النبويه', 'والسنه', 'والقران', 'القرءان', 'بخصوص', 'موضوع', 'معلومات', 'محتاج', 'اريد', 'ابغي'].map((x) => norm(x)));
 export function matchTopics(T, q) {
-  const nq = norm(q); const words = nq.split(' ').filter(Boolean);
+  const nq = (' ' + norm(q) + ' ').replace(/ (?:في|من|حسب|عند) (?:القران|الكتاب|القرءان)(?: الكريم)?(?: و)?(?: ?السنه(?: النبويه)?)? /g, ' ').replace(/ (?:في|من) (?:السنه النبويه|السنه|الاسلام) /g, ' ').replace(/\s+/g, ' ').trim(); const words = nq.split(' ').filter(Boolean);
   const meaningful = words.filter((w) => !STOP.has(w)).length;
-  const mwords = words.filter((w) => !STOP.has(w) && !GENQ.has(w));
+  const mwords = words.filter((w) => !STOP.has(w) && !GENQ.has(w) && !BOIL.has(w) && !BOIL.has(stem(w)));
   const vs = new Set(words.flatMap(variants));
   const padded = ' ' + nq + ' ';
   const res = [];
@@ -134,12 +161,22 @@ export function matchTopics(T, q) {
         const m = mwords.filter((w) => variants(w).some((v) => covered.has(v))).length;
         if (m < 2 && m < mwords.length) continue;
       }
-      res.push([t, s]);
+      const cw = new Set();
+      for (const g of covered) for (const gw of g.split(' ')) for (const w of mwords) if (gw === w || variants(w).includes(gw)) cw.add(w);
+      res.push([t, s + 0.8 * cw.size, cw]);
     }
   }
   res.sort((a, b) => b[1] - a[1]);
-  if (!res.length) return [];
-  return res.filter(([, s]) => s >= res[0][1] * 0.6).slice(0, 2).map(([t]) => t);
+  const out = [];
+  out.mwords = mwords; out.cov = new Map(); out.union = new Set();
+  if (!res.length) return out;
+  const union = new Set(); for (const [, sc, c] of res) if (sc >= res[0][1] * 0.6) for (const w of c) union.add(w);
+  const GENERIC = new Set(['الصلاة', 'الطهارة', 'حسن الخلق']);
+  if (res.length > 1 && res.some(([t]) => !GENERIC.has(t.name))) for (let i = res.length - 1; i >= 0; i--) if (GENERIC.has(res[i][0].name)) res.splice(i, 1);
+  const sel = res.filter(([, s]) => s >= res[0][1] * 0.6).slice(0, 3); out.union = union;
+  // a topic whose explained terms are a strict subset of another selected topic's is the generic parent: drop it
+  for (const [t, , c] of sel) { if (sel.some(([t2, , c2]) => t2 !== t && c2.size > c.size && [...c].every((w) => c2.has(w)))) continue; if (out.length < 2) { out.push(t); out.cov.set(t, c.size); } }
+  return out;
 }
 export function topicHadiths(D, topic, q, k = 6) {
   const qt = new Map();
@@ -161,15 +198,23 @@ export function topicHadiths(D, topic, q, k = 6) {
   return out;
 }
 export function answer(D, T, q, kw) {
-  const topics = matchTopics(T, q);
-  // Without a curated topic, loose single-term hits are usually off-topic: require most terms to hit.
-  const gen = searchLocal(D, q, kw, 8, 8, topics.length ? 0.34 : 0.55);
+  let topics = matchTopics(T, q);
+  // Coverage gate: if matched topics explain under half of the question's content terms,
+  // the question is about something more specific than the topic; do not return generic topic texts.
+  if (topics.length) {
+    const total = topics.mwords.length;
+    const best = Math.max(...topics.map((t) => topics.cov.get(t) || 0));
+    const cw = topics.union;
+    const unk = topics.mwords.filter((w) => !cw.has(w) && !FILL.has(stem(w)) && w.length >= 4 && !D.hix.post.has(stem(w)) && !D.aix.post.has(stem(w)));
+    if ((total >= 2 && cw.size / total <= 0.5) || unk.length) topics = [];
+  }
+  const gen = topics.length ? searchLocal(D, q, kw, 8, 8, 0.34) : searchLocal(D, q, kw, 8, 8, 0.6, true);
   if (!topics.length) return { topics: [], ...gen };
   const ayahs = [], seenA = new Set(), hads = [], seenH = new Set();
-  const hl = topics.map((t) => topicHadiths(D, t, q, 6));
-  const al = topics.map((t) => t.ay.slice(0, 7));
-  for (let i = 0; i < 8; i++) for (const l of al) if (l[i] && !seenA.has(l[i]) && ayahs.length < 7) { seenA.add(l[i]); ayahs.push({ id: l[i], curated: true }); }
-  for (let i = 0; i < 6; i++) for (const l of hl) if (l[i] && !seenH.has(l[i].id) && hads.length < 6) { seenH.add(l[i].id); hads.push(l[i]); }
+  const hl = topics.map((t) => topicHadiths(D, t, q, 5));
+  const al = topics.map((t) => t.ay.slice(0, 5));
+  for (let i = 0; i < 8; i++) for (const l of al) if (l[i] && !seenA.has(l[i]) && ayahs.length < 5) { seenA.add(l[i]); ayahs.push({ id: l[i], curated: true }); }
+  for (let i = 0; i < 6; i++) for (const l of hl) if (l[i] && !seenH.has(l[i].id) && hads.length < 5) { seenH.add(l[i].id); hads.push(l[i]); }
   if (hads.length < 3) for (const h of gen.hadiths) if (hads.length < 4 && !seenH.has(h.id)) { seenH.add(h.id); hads.push(h); }
   return { topics: topics.map((t) => t.name), ayahs, hadiths: hads };
 }
