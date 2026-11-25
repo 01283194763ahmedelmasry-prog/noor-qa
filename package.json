@@ -1,1 +1,1 @@
-{"name":"noor-qa","version":"1.0.0","type":"module","scripts":{"start":"node server.js"},"engines":{"node":">=18"}}
+{"name":"noor-qa","version":"1.0.0","type":"module","scripts":{"start":"node server.js"},"engines":{"node":">=18"},"dependencies":{"@huggingface/transformers":"^3.7.6"}}
