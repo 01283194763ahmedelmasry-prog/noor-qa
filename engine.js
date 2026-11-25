@@ -46,9 +46,22 @@ class Index {
   }
 }
 
+
+const dw = (w) => w.split('').map((c) => c + '[\\u064B-\\u0652\\u0670]*').join('');
+const SL = '(?:' + ['صلى', 'صلي'].map(dw).join('|') + ')\\s*' + dw('الله') + '\\s*' + dw('عليه') + '\\s*' + dw('وسلم');
+const RA = new RegExp('(' + dw('عن') + '\\s*' + dw('النبي') + '[^.،]{0,60}?' + SL + '[\\s.:،]*)');
+const RB = new RegExp('(?:^|[\\s،])(?:(?:' + ['قال', 'يقول', 'سمعت', 'ان', 'أن'].map(dw).join('|') + ')\\s*(?:' + ['رسول', 'النبي'].map(dw).join('|') + ')[^.،]{0,40}?' + SL + ')');
+function splitSanad(t) {
+  let m = RA.exec(t);
+  if (m && m.index < 900) { const cut = m.index + m[0].length; if (t.length - cut >= 12) return [t.slice(0, cut).trim(), t.slice(cut).trim()]; }
+  m = RB.exec(t);
+  if (m && m.index >= 15 && m.index < 900 && /حدثنا|اخبرنا|حَدَّثَنَا|أَخْبَرَنَا|عَنْ/.test(t.slice(0, m.index))) return [t.slice(0, m.index).trim(), t.slice(m.index).trim()];
+  return null;
+}
 export function loadData(dir = 'data') {
   const H = readJ(dir, 'hadiths.json');
   const A = readJ(dir, 'ayahs.json');
+  for (const id of Object.keys(H)) { const h = H[id]; if (!h[4] && h[3]) { const r = splitSanad(h[3]); if (r) { h[4] = r[0]; h[3] = r[1]; } } }
   const hids = Object.keys(H), hix = new Index();
   for (const id of hids) { const [, bk, ch, t, s] = H[id]; hix.add([[ch, 4], [bk, 1.5], [t || s, 1]]); }
   hix.done();
@@ -61,19 +74,20 @@ export function loadData(dir = 'data') {
 
 function queryTerms(q, kw) {
   const m = new Map();
-  for (const t of toks(q)) m.set(t, Math.max(m.get(t) || 0, 1));
+  const GEN = new Set(['فضل', 'حكم', 'معني', 'ماهو', 'اهميه', 'ماذا', 'كيف', 'لماذا', 'هل', 'ما', 'هو', 'هي', 'اريد', 'عايز', 'ايه', 'ازاي', 'قيمه']);
+  for (const t of toks(q)) if (!GEN.has(t)) m.set(t, Math.max(m.get(t) || 0, 1));
   for (const k of kw || []) for (const t of toks(k)) m.set(t, Math.max(m.get(t) || 0, 0.9));
   return m;
 }
 function rank(ix, qt, k, minFrac) {
   const { sc, hit } = ix.score(qt); const tot = [...qt.values()].reduce((a, b) => a + b, 0) || 1;
-  const arr = [...sc].map(([d, s]) => [d, s * (0.4 + 0.6 * Math.min(1, (hit.get(d) / tot) * 2.2))]).sort((a, b) => b[1] - a[1]);
+  const arr = [...sc].map(([d, s]) => [d, s * (0.4 + 0.6 * Math.min(1, (hit.get(d) / tot) * 2.2)), hit.get(d) / tot]).sort((a, b) => b[1] - a[1]);
   return arr.slice(0, k);
 }
 export function searchLocal(D, q, kw, ka = 8, kh = 8) {
   const qt = queryTerms(q, kw);
   if (!qt.size) return { ayahs: [], hadiths: [] };
-  const hr = rank(D.hix, qt, kh), ar = rank(D.aix, qt, ka);
+  const hr = rank(D.hix, qt, kh, 1).filter((x) => x[2] >= 0.34), ar = rank(D.aix, qt, ka, 1).filter((x) => x[2] >= 0.34);
   const hTop = hr.length ? hr[0][1] : 0, aTop = ar.length ? ar[0][1] : 0;
   return {
     hadiths: hr.filter(([, s]) => s >= hTop * 0.45).map(([d, s]) => ({ id: D.hids[d], score: s })),
