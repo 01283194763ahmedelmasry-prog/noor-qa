@@ -192,8 +192,10 @@ http.createServer(async (req, res) => {
       const inp = await body(req);
       const q = String(inp.q || '').trim().slice(0, 500);
       if (q.length < 2) return send(res, 400, { error: 'query_required' });
-      if (FATWA_TOPICS.some((w) => q.includes(w))) return send(res, 200, { fatwa: FATWA_MSG, ayahs: [], hadiths: [] });
+      const fat = FATWA_TOPICS.some((w) => q.includes(w));
+      if (fat && !/ميراث|ورث|إرث|ارث|تركة|فرائض/.test(q)) return send(res, 200, { fatwa: FATWA_MSG, ayahs: [], hadiths: [] });
       const out = await search(q);
+      if (fat) out.fatwa = FATWA_MSG;
       if (!out.ayahs.length && !out.hadiths.length) return send(res, 200, { none: true, ayahs: [], hadiths: [] });
       return send(res, 200, out);
     }
