@@ -111,6 +111,8 @@ export function searchLocal(D, q, kw, ka = 8, kh = 8, minFrac = 0.34, strict = f
       for (let a = 0; a < pos.length; a++) { const seen = new Set(); for (let b = a; b < pos.length && pos[b][0] - pos[a][0] <= 25; b++) seen.add(pos[b][1]); if (seen.size === need.size) return true; }
       return false; };
     const hr = rank(D.hix, qt, 80, 1).filter((x) => x[2] >= minFrac && hasH.has(x[0]) && near(x[0]) && ((titleHas(x[0]) && x[2] >= minFrac) || (multi && x[2] >= 0.99 && (D.H[D.hids[x[0]]][3] || D.H[D.hids[x[0]]][4] || '').length < 500))).slice(0, 5), ar = rank(D.aix, qt, 80, 1).filter((x) => x[2] >= minFrac && hasA.has(x[0]) && ayHas(x[0]) && x[2] >= 0.99).slice(0, 4);
+    const ruling = /^(?:ما |هل )?(?:حكم|يجوز|يحل|حلال|حرام)/.test(norm(q)) || /(?:هل يجوز|حلال ام حرام|حكمه)/.test(norm(q));
+    if (ruling) ar.length = 0; // ruling questions: narrative mentions in the Quran are not the ruling
     return { hadiths: hr.map(([d, s]) => ({ id: D.hids[d], score: s })), ayahs: ar.map(([d, s]) => ({ id: D.A[d][0], score: s })) };
   }
   const hr = rank(D.hix, qt, kh, 1).filter((x) => x[2] >= minFrac), ar = rank(D.aix, qt, ka, 1).filter((x) => x[2] >= minFrac);
