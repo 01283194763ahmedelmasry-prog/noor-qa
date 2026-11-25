@@ -4,6 +4,9 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadData, loadTopics, answer } from './engine.js';
+const D = loadData(), TOPICS = loadTopics();
+const explainCache = new Map();
 if (fs.existsSync('.env')) for (const l of fs.readFileSync('.env', 'utf8').split('\n')) { const m = /^([A-Z_]+)=(.*)$/.exec(l.trim()); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2]; }
 const KEY = process.env.GEMINI_API_KEY;
 const ADMIN = process.env.ADMIN_TOKEN || '';
@@ -65,22 +68,19 @@ async function expandQuery(q) {
 
 async function search(q) {
   const kw = await expandQuery(q);
-  const lex = kw.length ? kw.map((k) => k.split(/\s+/).join(' ')).join(' or ') : q;
-  const emb = await embedOne(kw.length ? q + ' ' + kw.join(' ') : q);
-  const r = await sb('/rest/v1/rpc/qa_search', { method: 'POST', body: JSON.stringify({ q: lex, emb: JSON.stringify(emb), ka: 5, kh: 5 }) });
-  if (!r.ok) { console.log('qa_search', r.status, (await r.text()).slice(0, 300)); throw new Error('search_failed'); }
-  const rows = await r.json();
+  const r = answer(D, TOPICS, q, kw);
   return {
-    ayahs: rows.filter((x) => x.kind === 'ayah').map(({ id, ref, body, extra, url, score }) => ({ id, ref, text: body, tafsir: extra, url, score })),
-    hadiths: rows.filter((x) => x.kind === 'hadith').map(({ id, ref, body, extra, grade, url, score }) => ({ id, ref, matn: body, chapter: extra, grade, url, score })),
+    topics: r.topics,
+    ayahs: r.ayahs.map(({ id }) => { const x = D.A[D.aById.get(id)]; return { id, ref: x[2] + ' ' + x[3], text: x[4], tafsir: x[5], url: 'https://quran.com/' + id.replace(':', '/') }; }),
+    hadiths: r.hadiths.map(({ id }) => { const x = D.H[id]; return { id, ref: x[0] + ' - ' + x[1], matn: x[3] || x[4], sanad: x[3] ? x[4] : '', chapter: x[2], grade: 'صحيح', url: x[5] || ('https://sunnah.com/' + id) }; }),
   };
 }
 
 async function explainHadith(id) {
-  const got = await sb('/rest/v1/qa_hadiths?id=eq.' + encodeURIComponent(id) + '&select=id,matn,simple_explanation');
-  const h = (await got.json())[0];
-  if (!h) return null;
-  if (h.simple_explanation) return h.simple_explanation;
+  const x = D.H[id];
+  if (!x) return null;
+  if (explainCache.has(id)) return explainCache.get(id);
+  const h = { matn: (x[3] || x[4]).slice(0, 2500) };
   const prompt = `اشرح معنى الحديث التالي بلغة عربية بسيطة جدًا يفهمها الناس العاديون، في 3 إلى 5 جمل قصيرة. التزم بمعنى نص الحديث فقط: لا تضف أحكامًا ولا معلومات من خارجه ولا تُفتي. اكتب الشرح مباشرة بدون مقدمات.\n\nالحديث: ${h.matn}`;
   let out = null;
   outer: for (const m of GEN_MODELS) {
@@ -96,7 +96,7 @@ async function explainHadith(id) {
       await sleep(1500 * (a + 1));
     }
   }
-  if (out) await sb('/rest/v1/qa_hadiths?id=eq.' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ simple_explanation: out }) });
+  if (out) explainCache.set(id, out);
   return out;
 }
 
