@@ -4,6 +4,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 if (fs.existsSync('.env')) for (const l of fs.readFileSync('.env', 'utf8').split('\n')) { const m = /^([A-Z_]+)=(.*)$/.exec(l.trim()); if (m && !(m[1] in process.env)) process.env[m[1]] = m[2]; }
 const KEY = process.env.GEMINI_API_KEY;
 const ADMIN = process.env.ADMIN_TOKEN || '';
@@ -83,8 +84,9 @@ async function explainHadith(id) {
 let cache = {};
 function loadData(kind) {
   if (cache[kind]) return cache[kind];
-  const file = path.join('data', kind === 'ayahs' ? 'ayahs.jsonl' : 'hadiths.jsonl');
-  const rows = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const base = path.join('data', kind === 'ayahs' ? 'ayahs.jsonl' : 'hadiths.jsonl');
+  const raw = fs.existsSync(base + '.gz') ? zlib.gunzipSync(fs.readFileSync(base + '.gz')).toString('utf8') : fs.readFileSync(base, 'utf8');
+  const rows = raw.split('\n').filter(Boolean).map((l) => JSON.parse(l));
   cache[kind] = rows;
   return rows;
 }
