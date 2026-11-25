@@ -79,31 +79,89 @@ async function explainHadith(id) {
   return out;
 }
 
-// --- one-time data import (chunked, resumable) ---
-let cache = {};
-function loadData(kind) {
-  if (cache[kind]) return cache[kind];
-  const prefix = kind === 'ayahs' ? 'ayahs-' : 'hadiths-';
-  const files = fs.readdirSync('data').filter((f) => f.startsWith(prefix) && f.endsWith('.jsonl')).sort();
-  const rows = files.flatMap((f) => fs.readFileSync(path.join('data', f), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)));
-  cache[kind] = rows;
+// --- one-time data import (chunked, resumable; fetches verified public sources itself) ---
+const SURAH_NAMES = 'الفاتحة|البقرة|آل عمران|النساء|المائدة|الأنعام|الأعراف|الأنفال|التوبة|يونس|هود|يوسف|الرعد|إبراهيم|الحجر|النحل|الإسراء|الكهف|مريم|طه|الأنبياء|الحج|المؤمنون|النور|الفرقان|الشعراء|النمل|القصص|العنكبوت|الروم|لقمان|السجدة|الأحزاب|سبأ|فاطر|يس|الصافات|ص|الزمر|غافر|فصلت|الشورى|الزخرف|الدخان|الجاثية|الأحقاف|محمد|الفتح|الحجرات|ق|الذاريات|الطور|النجم|القمر|الرحمن|الواقعة|الحديد|المجادلة|الحشر|الممتحنة|الصف|الجمعة|المنافقون|التغابن|الطلاق|التحريم|الملك|القلم|الحاقة|المعارج|نوح|الجن|المزمل|المدثر|القيامة|الإنسان|المرسلات|النبأ|النازعات|عبس|التكوير|الانفطار|المطففين|الانشقاق|البروج|الطارق|الأعلى|الغاشية|الفجر|البلد|الشمس|الليل|الضحى|الشرح|التين|العلق|القدر|البينة|الزلزلة|العاديات|القارعة|التكاثر|العصر|الهمزة|الفيل|قريش|الماعون|الكوثر|الكافرون|النصر|المسد|الإخلاص|الفلق|الناس'.split('|');
+const BASMALA_RE = /^بِسْمِ\s+\S+\s+\S+\s+\S+\s+/;
+const TANZIL = 'https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true';
+const MUYASSAR = (s) => `https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@main/tafsir/ar-tafsir-muyassar/${s}.json`;
+const HF_ROWS = (off, len) => `https://datasets-server.huggingface.co/rows?dataset=freococo%2Fsunnah_dataset&config=default&split=train&offset=${off}&length=${len}`;
+const HF_TOTAL = 39318, TARGET = { 'Sahih al-Bukhari': 'صحيح البخاري', 'Sahih Muslim': 'صحيح مسلم' };
+const fetchJ = async (u) => { const r = await fetch(u); if (!r.ok) throw new Error('fetch ' + r.status + ' ' + u.slice(0, 80)); return r.json(); };
+
+let quranCache = null;
+async function loadQuran() {
+  if (quranCache) return quranCache;
+  const txt = await (await fetch(TANZIL)).text();
+  const tafsirs = {};
+  for (let s = 1; s <= 114; s++) tafsirs[s] = await fetchJ(MUYASSAR(s));
+  const rows = [];
+  for (const line of txt.split('\n')) {
+    const m = /^(\d+)\|(\d+)\|(.*)$/.exec(line.trim());
+    if (!m) continue;
+    const s = +m[1], a = +m[2]; let t = m[3].trim();
+    if (a === 1 && s !== 1 && s !== 9 && t.split(' ')[0].startsWith('بِسْمِ')) t = t.split(' ').slice(4).join(' ');
+    let tf = (tafsirs[s] && tafsirs[s][a - 1] && tafsirs[s][a - 1].text) || '';
+    tf = tf.replace(/(^|\n\n)\[التفسير\]\s*/g, '$1');
+    if (a === 1) { // strip surah intro paragraphs
+      const paras = tf.split('\n\n'); const kept = []; let started = false;
+      for (const p of paras) {
+        if (!started && (p.startsWith('تسمية السورة') || p.startsWith('من مقاصد السورة') || p.trimStart().startsWith('•'))) continue;
+        started = true; kept.push(p);
+      }
+      tf = kept.join('\n\n').trim();
+    }
+    rows.push({ id: `${s}:${a}`, surah: s, surah_name: SURAH_NAMES[s - 1], ayah: a, text: t, tafsir: tf });
+  }
+  if (rows.length !== 6236) throw new Error('quran rows ' + rows.length);
+  quranCache = rows;
   return rows;
 }
+
+// Fetch one page of the Sunnah.com dataset export and keep Bukhari/Muslim rows.
+async function hadithPage(off, len) {
+  const j = await fetchJ(HF_ROWS(off, len));
+  const out = [];
+  for (const w of j.rows || []) {
+    const r = w.row;
+    if (!TARGET[r.collection]) continue;
+    const url = (r.url || '').trim();
+    const id = url.split('sunnah.com/').pop().replace(/\/+$/, '') || (r.collection + ':' + r.hadith_id);
+    let grade = 'صحيح';
+    try { const g = typeof r.gradings === 'string' ? JSON.parse(r.gradings) : (r.gradings || []); if (g[0] && g[0].grade) grade = g[0].grade; } catch {}
+    out.push({ id, collection: TARGET[r.collection], book_ar: (r.book_ar || '').trim(), chapter_ar: (r.chapter_ar || '').trim(), matn: ((r.arabic_matn || '').trim() || (r.arabic_full || '').trim()), grade, url });
+  }
+  return out;
+}
+
 const ayahDoc = (r) => `سورة ${r.surah_name} الآية ${r.ayah}: ${r.text}\nالتفسير: ${String(r.tafsir).slice(0, 600)}`;
 const hadithDoc = (r) => `${r.collection} - ${r.book_ar} - ${r.chapter_ar}: ${r.matn}`;
 
-async function importChunk(kind, offset, limit) {
-  const rows = loadData(kind);
+async function importAyahs(offset, limit) {
+  const rows = await loadQuran();
   const slice = rows.slice(offset, offset + limit);
-  if (!slice.length) return { done: true, total: rows.length, offset };
-  const docs = slice.map(kind === 'ayahs' ? ayahDoc : hadithDoc);
-  const embs = await embedBatch(docs);
-  const payload = slice.map((r, i) => kind === 'ayahs'
-    ? { id: r.id, surah: r.surah, surah_name: r.surah_name, ayah: r.ayah, text: r.text, tafsir: r.tafsir, embedding: JSON.stringify(embs[i]) }
-    : { id: r.id, collection: r.collection, book_ar: r.book_ar, chapter_ar: r.chapter_ar, matn: r.matn, grade: r.grade, url: r.url, embedding: JSON.stringify(embs[i]) });
-  const r = await sb('/rest/v1/' + (kind === 'ayahs' ? 'qa_ayahs' : 'qa_hadiths'), { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(payload) });
-  if (!r.ok) { console.log('import', r.status, (await r.text()).slice(0, 400)); throw new Error('import_failed'); }
+  if (slice.length) {
+    const embs = await embedBatch(slice.map(ayahDoc));
+    const payload = slice.map((r, i) => ({ ...r, embedding: JSON.stringify(embs[i]) }));
+    const r = await sb('/rest/v1/qa_ayahs', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(payload) });
+    if (!r.ok) { console.log('import ayahs', r.status, (await r.text()).slice(0, 400)); throw new Error('import_failed'); }
+  }
   return { done: offset + limit >= rows.length, total: rows.length, offset: offset + limit };
+}
+
+// offset = position in the source dataset (0..39318); keeps Bukhari/Muslim only. Returns next offset.
+async function importHadiths(offset, pages) {
+  let kept = [];
+  for (let p = 0; p < pages && offset < HF_TOTAL; p++, offset += 100) kept = kept.concat(await hadithPage(offset, 100));
+  if (kept.length) {
+    for (let i = 0; i < kept.length; i += 100) {
+      const slice = kept.slice(i, i + 100);
+      const embs = await embedBatch(slice.map(hadithDoc));
+      const payload = slice.map((r, j) => ({ ...r, embedding: JSON.stringify(embs[j]) }));
+      const r = await sb('/rest/v1/qa_hadiths', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(payload) });
+      if (!r.ok) { console.log('import hadiths', r.status, (await r.text()).slice(0, 400)); throw new Error('import_failed'); }
+    }
+  }
+  return { done: offset >= HF_TOTAL, total: HF_TOTAL, offset, kept: kept.length };
 }
 
 http.createServer(async (req, res) => {
@@ -128,8 +186,9 @@ http.createServer(async (req, res) => {
     if (u.pathname === '/api/admin/import' && req.method === 'POST') {
       const b = await body(req);
       if (!ADMIN || b.token !== ADMIN) return send(res, 403, { error: 'forbidden' });
-      const kind = b.kind === 'hadiths' ? 'hadiths' : 'ayahs';
-      const out = await importChunk(kind, Math.max(0, Number(b.offset) || 0), Math.min(100, Number(b.limit) || 100));
+      const out = b.kind === 'hadiths'
+        ? await importHadiths(Math.max(0, Number(b.offset) || 0), Math.min(20, Number(b.pages) || 10))
+        : await importAyahs(Math.max(0, Number(b.offset) || 0), Math.min(100, Number(b.limit) || 100));
       return send(res, 200, out);
     }
     if (u.pathname === '/api/admin/status' && req.method === 'POST') {
