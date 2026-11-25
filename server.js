@@ -26,23 +26,23 @@ process.on('uncaughtException', (e) => console.error('uncaughtException', e));
 process.on('unhandledRejection', (e) => console.error('unhandledRejection', e));
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
-// Local multilingual embeddings (no API key): paraphrase-multilingual-MiniLM-L12-v2, 384 dims, int8.
-let embedderP = null;
-function getEmbedder() {
-  if (!embedderP) embedderP = import('@huggingface/transformers').then((m) =>
-    m.pipeline('feature-extraction', process.env.EMB_MODEL || 'Xenova/paraphrase-multilingual-MiniLM-L12-v2', { dtype: 'int8' }));
-  return embedderP;
-}
-async function embedBatch(texts) {
-  const ex = await getEmbedder();
-  const out = [];
-  for (let i = 0; i < texts.length; i += 25) {
-    const t = await ex(texts.slice(i, i + 25), { pooling: 'mean', normalize: true, truncation: true, max_length: 256 });
-    out.push(...t.tolist());
+// Embeddings: Gemini gemini-embedding-001 (768 dims). Task type differs for documents vs queries.
+const EMB_MODEL = process.env.EMB_MODEL || 'gemini-embedding-001';
+async function embedBatch(texts, taskType = 'RETRIEVAL_DOCUMENT') {
+  for (let a = 0; a < 5; a++) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${EMB_MODEL}:batchEmbedContents`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
+      body: JSON.stringify({ requests: texts.map((t) => ({ model: 'models/' + EMB_MODEL, content: { parts: [{ text: t }] }, taskType, outputDimensionality: 768 })) }),
+    });
+    if (r.ok) return (await r.json()).embeddings.map((e) => e.values);
+    const st = r.status;
+    console.log('embed', st, (await r.text()).slice(0, 200));
+    if (st !== 503 && st !== 429 && st !== 500) throw new Error('embed ' + st);
+    await sleep(2500 * (a + 1));
   }
-  return out;
+  throw new Error('embed retries exhausted');
 }
-const embedOne = async (t) => (await embedBatch([t]))[0];
+const embedOne = async (t) => (await embedBatch([t], 'RETRIEVAL_QUERY'))[0];
 
 async function search(q) {
   const emb = await embedOne(q);
@@ -214,6 +214,24 @@ http.createServer(async (req, res) => {
       const r = await sb('/rest/v1/' + tbl, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(rows) });
       if (!r.ok) { console.log('load', r.status, (await r.text()).slice(0, 300)); return send(res, 500, { error: 'load_failed ' + r.status }); }
       return send(res, 200, { loaded: rows.length });
+    }
+    if (u.pathname === '/api/admin/reembed' && req.method === 'POST') {
+      const b = await body(req);
+      if (!ADMIN || b.token !== ADMIN) return send(res, 403, { error: 'forbidden' });
+      const had = b.kind === 'hadiths';
+      const tbl = had ? 'qa_hadiths' : 'qa_ayahs';
+      const cols = had ? 'id,collection,book_ar,chapter_ar,matn,grade,url,simple_explanation' : 'id,surah,surah_name,ayah,text,tafsir';
+      const off = Math.max(0, Number(b.offset) || 0), lim = Math.min(100, Number(b.limit) || 100);
+      const g = await sb(`/rest/v1/${tbl}?select=${cols}&order=id&offset=${off}&limit=${lim}`);
+      if (!g.ok) return send(res, 500, { error: 'read_failed ' + g.status });
+      const rows = await g.json();
+      if (rows.length) {
+        const embs = await embedBatch(rows.map(had ? hadithDoc : ayahDoc));
+        const payload = rows.map((r, i) => ({ ...r, embedding: JSON.stringify(embs[i]) }));
+        const w = await sb('/rest/v1/' + tbl, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify(payload) });
+        if (!w.ok) { console.log('reembed', w.status, (await w.text()).slice(0, 300)); return send(res, 500, { error: 'write_failed ' + w.status }); }
+      }
+      return send(res, 200, { offset: off + rows.length, done: rows.length < lim });
     }
     if (u.pathname === '/api/admin/status' && req.method === 'POST') {
       const b = await body(req);
