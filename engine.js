@@ -74,7 +74,7 @@ export function loadData(dir = 'data') {
 
 function queryTerms(q, kw) {
   const m = new Map();
-  const GEN = new Set(['فضل', 'حكم', 'معني', 'ماهو', 'اهميه', 'ماذا', 'كيف', 'لماذا', 'هل', 'ما', 'هو', 'هي', 'اريد', 'عايز', 'ايه', 'ازاي', 'قيمه']);
+  const GEN = new Set(['فضل', 'حكم', 'معني', 'ماهو', 'اهميه', 'ماذا', 'كيف', 'لماذا', 'هل', 'ما', 'هو', 'هي', 'اريد', 'عايز', 'ايه', 'ازاي', 'قيمه', 'عمل', 'العمل', 'طريقه', 'الطريقه', 'طريق', 'حاجه', 'شيء', 'وصف', 'حرمه']);
   for (const t of toks(q)) if (!GEN.has(t)) m.set(t, Math.max(m.get(t) || 0, 1));
   for (const k of kw || []) for (const t of toks(k)) m.set(t, Math.max(m.get(t) || 0, 0.9));
   return m;
@@ -84,10 +84,10 @@ function rank(ix, qt, k, minFrac) {
   const arr = [...sc].map(([d, s]) => [d, s * (0.4 + 0.6 * Math.min(1, (hit.get(d) / tot) * 2.2)), hit.get(d) / tot]).sort((a, b) => b[1] - a[1]);
   return arr.slice(0, k);
 }
-export function searchLocal(D, q, kw, ka = 8, kh = 8) {
+export function searchLocal(D, q, kw, ka = 8, kh = 8, minFrac = 0.34) {
   const qt = queryTerms(q, kw);
   if (!qt.size) return { ayahs: [], hadiths: [] };
-  const hr = rank(D.hix, qt, kh, 1).filter((x) => x[2] >= 0.34), ar = rank(D.aix, qt, ka, 1).filter((x) => x[2] >= 0.34);
+  const hr = rank(D.hix, qt, kh, 1).filter((x) => x[2] >= minFrac), ar = rank(D.aix, qt, ka, 1).filter((x) => x[2] >= minFrac);
   const hTop = hr.length ? hr[0][1] : 0, aTop = ar.length ? ar[0][1] : 0;
   return {
     hadiths: hr.filter(([, s]) => s >= hTop * 0.45).map(([d, s]) => ({ id: D.hids[d], score: s })),
@@ -96,7 +96,7 @@ export function searchLocal(D, q, kw, ka = 8, kh = 8) {
 }
 
 // ---------------- curated topics ----------------
-const WEAK = new Set(['الله', 'ربنا', 'عمل', 'العمل', 'هم', 'الهم', 'الام', 'الاب', 'امي', 'ابي', 'الحرام', 'الحلال', 'الكلام', 'الكلمه', 'النساء', 'المراه', 'الزوج', 'الزوجه', 'الرسول', 'رسول الله', 'محمد', 'الاخره', 'الاجل', 'الغني', 'الرضا', 'الحمد', 'نعمه', 'الحكم', 'الدين', 'دين', 'السفر', 'المسافر', 'الطريق', 'المعروف', 'القبر', 'الموت', 'السر', 'الوقت', 'العمر', 'الايام', 'الرزق', 'رزق', 'الدنيا', 'علم', 'العلم', 'الاكل', 'اكل', 'شرب', 'الشرب', 'نوم', 'النوم', 'الطعام', 'المسجد', 'الجار', 'جار', 'الضيف', 'ضيف', 'الاسلام', 'الايمان', 'اركان', 'المرض', 'مرض', 'الفقر', 'فقر', 'الحكم', 'السنه', 'الصحه', 'خلق', 'الاخلاق', 'الادب', 'السلوك', 'اولاد', 'الاولاد', 'الطفل', 'الاطفال', 'البصر', 'النظر', 'الزينه', 'عمره', 'ملابس', 'الاقارب', 'الصديق', 'صديق', 'السلام', 'سلام', 'الجمع', 'الفطر', 'الفجر', 'الصبح', 'صبح', 'قدر', 'القدر', 'الحج', 'حج', 'شكر', 'الشكر', 'عهد', 'العهد', 'وعد', 'الوعد', 'ذكر', 'الذكر', 'الكسب', 'الغش', 'غش', 'الظلم', 'ظلم', 'الصدق', 'صدق', 'كذب', 'الكذب', 'نار', 'النار', 'جنه', 'الجنه', 'عذاب', 'الاحسان', 'العدل', 'عدل', 'الحيوان', 'حيوان', 'الذبح', 'ذبح', 'النهار', 'العيد', 'عيد', 'الابتلاء', 'البلاء', 'الدوره', 'الشباب', 'الحشر', 'الحساب', 'البعث', 'الامير', 'السلطان', 'الخوف']);
+const WEAK = new Set(['الله', 'ربنا', 'عمل', 'العمل', 'هم', 'الهم', 'الام', 'الاب', 'امي', 'ابي', 'الحرام', 'الحلال', 'الكلام', 'الكلمه', 'النساء', 'المراه', 'الزوج', 'الزوجه', 'الرسول', 'رسول الله', 'محمد', 'الاخره', 'الاجل', 'الغني', 'الرضا', 'الحمد', 'نعمه', 'الحكم', 'الدين', 'دين', 'السفر', 'المسافر', 'الطريق', 'المعروف', 'القبر', 'الموت', 'السر', 'الوقت', 'العمر', 'الايام', 'الرزق', 'رزق', 'الدنيا', 'علم', 'العلم', 'الاكل', 'اكل', 'شرب', 'الشرب', 'نوم', 'النوم', 'الطعام', 'المسجد', 'الجار', 'جار', 'الضيف', 'ضيف', 'الاسلام', 'الايمان', 'اركان', 'المرض', 'مرض', 'الفقر', 'فقر', 'الحكم', 'السنه', 'الصحه', 'خلق', 'الاخلاق', 'الادب', 'السلوك', 'اولاد', 'الاولاد', 'الطفل', 'الاطفال', 'البصر', 'النظر', 'الزينه', 'عمره', 'ملابس', 'الاقارب', 'الصديق', 'صديق', 'السلام', 'سلام', 'الجمع', 'الفطر', 'الفجر', 'الصبح', 'صبح', 'قدر', 'القدر', 'الحج', 'حج', 'شكر', 'الشكر', 'عهد', 'العهد', 'وعد', 'الوعد', 'ذكر', 'الذكر', 'الكسب', 'الغش', 'غش', 'الظلم', 'ظلم', 'الصدق', 'صدق', 'كذب', 'الكذب', 'نار', 'النار', 'جنه', 'الجنه', 'عذاب', 'الاحسان', 'العدل', 'عدل', 'الحيوان', 'حيوان', 'الذبح', 'ذبح', 'النهار', 'العيد', 'عيد', 'الابتلاء', 'البلاء', 'الدوره', 'الشباب', 'الحشر', 'الحساب', 'البعث', 'الامير', 'السلطان', 'الخوف', 'تربيه', 'تربية']);
 const nTrig = (s) => norm(s);
 export function loadTopics(dir = 'data') {
   const T = readJ(dir, 'topics.json');
@@ -107,23 +107,35 @@ export function loadTopics(dir = 'data') {
   return T;
 }
 const variants = (w) => { const v = new Set([w]); for (const sx of ['ي', 'ك', 'ها', 'ه', 'نا']) if (w.endsWith(sx) && w.length - sx.length >= 3) v.add(w.slice(0, -sx.length)); const base = [...v]; for (const b of base) for (const p of ['وال', 'بال', 'فال', 'كال', 'لل', 'ال', 'و', 'ب', 'ل']) if (b.startsWith(p) && b.length - p.length >= 2) v.add(b.slice(p.length)); return [...v]; };
+const GENQ = new Set(['فضل', 'حكم', 'معني', 'ماهو', 'ماهي', 'اهميه', 'ماذا', 'كيف', 'لماذا', 'هل', 'اريد', 'عايز', 'ايه', 'ازاي', 'قيمه', 'جائز', 'يجوز', 'دليل', 'اية', 'حديث', 'وصف', 'حرمه']);
 export function matchTopics(T, q) {
   const nq = norm(q); const words = nq.split(' ').filter(Boolean);
   const meaningful = words.filter((w) => !STOP.has(w)).length;
+  const mwords = words.filter((w) => !STOP.has(w) && !GENQ.has(w));
   const vs = new Set(words.flatMap(variants));
   const padded = ' ' + nq + ' ';
   const res = [];
   for (const t of T) {
-    let s = 0;
+    let s = 0, strong = false; const covered = new Set();
     for (const g of t.n) {
       const multi = g.includes(' ');
       const hit = multi ? padded.includes(' ' + g + ' ') || padded.includes(' ' + g) : vs.has(g);
       if (!hit) continue;
       const weak = WEAK.has(g) && !multi;
       if (weak && meaningful > 3) continue;
+      if (!weak) strong = true;
+      covered.add(g);
       s = Math.max(s, (multi ? 2.5 : 1) * (weak ? 0.5 : 1) * (g.length >= 5 ? 1.2 : 1) + (multi ? 0.5 : 0));
     }
-    if (s > 0) res.push([t, s]);
+    if (s > 0) {
+      // Ambiguous one-word (weak) triggers cannot carry a topic alone: they need a
+      // distinctive phrase/long word, or corroboration by a second meaningful question term.
+      if (!strong && mwords.length) {
+        const m = mwords.filter((w) => variants(w).some((v) => covered.has(v))).length;
+        if (m < 2 && m < mwords.length) continue;
+      }
+      res.push([t, s]);
+    }
   }
   res.sort((a, b) => b[1] - a[1]);
   if (!res.length) return [];
@@ -150,7 +162,8 @@ export function topicHadiths(D, topic, q, k = 6) {
 }
 export function answer(D, T, q, kw) {
   const topics = matchTopics(T, q);
-  const gen = searchLocal(D, q, kw, 8, 8);
+  // Without a curated topic, loose single-term hits are usually off-topic: require most terms to hit.
+  const gen = searchLocal(D, q, kw, 8, 8, topics.length ? 0.34 : 0.55);
   if (!topics.length) return { topics: [], ...gen };
   const ayahs = [], seenA = new Set(), hads = [], seenH = new Set();
   const hl = topics.map((t) => topicHadiths(D, t, q, 6));
