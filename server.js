@@ -44,9 +44,30 @@ async function embedBatch(texts) {
 }
 const embedOne = async (t) => (await embedBatch([t]))[0];
 
+// Query expansion: the LLM only rewrites the question into classical Arabic search keywords; it never answers.
+const expCache = new Map();
+async function expandQuery(q) {
+  if (expCache.has(q)) return expCache.get(q);
+  const prompt = `حوّل السؤال التالي إلى كلمات بحث عربية فصيحة تظهر في نصوص القرآن الكريم وكتب الحديث (الصحيحين) المتعلقة بموضوعه، مثل المصطلحات الشرعية والألفاظ الواردة في النصوص. أعد من 4 إلى 8 كلمات أو عبارات قصيرة مفصولة بفاصلة فقط، بدون شرح وبدون أي حكم.\n\nالسؤال: ${q}`;
+  let kw = [];
+  try {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEN_MODELS[0]}:generateContent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }), signal: AbortSignal.timeout(7000),
+    });
+    if (r.ok) { const j = await r.json(); const t = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join(''); kw = t.split(/[,،\n]/).map((x) => x.replace(/[^\u0600-\u06FF\s]/g, '').trim()).filter((x) => x && x.length < 40).slice(0, 8); }
+    else console.log('expand', r.status);
+  } catch (e) { console.log('expand err', String(e.message)); }
+  if (expCache.size > 500) expCache.clear();
+  expCache.set(q, kw);
+  return kw;
+}
+
 async function search(q) {
-  const emb = await embedOne(q);
-  const r = await sb('/rest/v1/rpc/qa_search', { method: 'POST', body: JSON.stringify({ q, emb: JSON.stringify(emb), ka: 5, kh: 5 }) });
+  const kw = await expandQuery(q);
+  const lex = kw.length ? kw.map((k) => k.split(/\s+/).join(' ')).join(' or ') : q;
+  const emb = await embedOne(kw.length ? q + ' ' + kw.join(' ') : q);
+  const r = await sb('/rest/v1/rpc/qa_search', { method: 'POST', body: JSON.stringify({ q: lex, emb: JSON.stringify(emb), ka: 5, kh: 5 }) });
   if (!r.ok) { console.log('qa_search', r.status, (await r.text()).slice(0, 300)); throw new Error('search_failed'); }
   const rows = await r.json();
   return {
