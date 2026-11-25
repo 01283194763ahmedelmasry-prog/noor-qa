@@ -9,8 +9,6 @@ const KEY = process.env.GEMINI_API_KEY;
 const ADMIN = process.env.ADMIN_TOKEN || '';
 const PORT = Number(process.env.PORT || 3000);
 const SB = process.env.SUPABASE_URL, SBK = process.env.SUPABASE_SERVICE_KEY;
-const EMB_MODEL = process.env.EMB_MODEL || 'text-embedding-004';
-const EMB_DIMS = Number(process.env.EMB_DIMS || 768);
 const GEN_MODELS = [...new Set([process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3-flash'])];
 const sb = (p, o = {}) => fetch(SB + p, { ...o, headers: { apikey: SBK, ...(SBK && !SBK.startsWith('sb_') ? { Authorization: 'Bearer ' + SBK } : {}), 'Content-Type': 'application/json', ...(o.headers || {}) } });
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
@@ -28,19 +26,21 @@ process.on('uncaughtException', (e) => console.error('uncaughtException', e));
 process.on('unhandledRejection', (e) => console.error('unhandledRejection', e));
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
+// Local multilingual embeddings (no API key): paraphrase-multilingual-MiniLM-L12-v2, 384 dims, int8.
+let embedderP = null;
+function getEmbedder() {
+  if (!embedderP) embedderP = import('@huggingface/transformers').then((m) =>
+    m.pipeline('feature-extraction', process.env.EMB_MODEL || 'Xenova/paraphrase-multilingual-MiniLM-L12-v2', { dtype: 'int8' }));
+  return embedderP;
+}
 async function embedBatch(texts) {
-  for (let a = 0; a < 4; a++) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${EMB_MODEL}:batchEmbedContents`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
-      body: JSON.stringify({ requests: texts.map((t) => ({ model: 'models/' + EMB_MODEL, content: { parts: [{ text: t }] }, outputDimensionality: EMB_DIMS })) }),
-    });
-    if (r.ok) return (await r.json()).embeddings.map((e) => e.values);
-    const st = r.status;
-    console.log('embed', st, (await r.text()).slice(0, 300));
-    if (st !== 503 && st !== 429) throw new Error('embed ' + st);
-    await sleep(2000 * (a + 1));
+  const ex = await getEmbedder();
+  const out = [];
+  for (let i = 0; i < texts.length; i += 25) {
+    const t = await ex(texts.slice(i, i + 25), { pooling: 'mean', normalize: true, truncation: true, max_length: 256 });
+    out.push(...t.tolist());
   }
-  throw new Error('embed retries exhausted');
+  return out;
 }
 const embedOne = async (t) => (await embedBatch([t]))[0];
 
@@ -190,6 +190,21 @@ http.createServer(async (req, res) => {
         ? await importHadiths(Math.max(0, Number(b.offset) || 0), Math.min(20, Number(b.pages) || 10))
         : await importAyahs(Math.max(0, Number(b.offset) || 0), Math.min(100, Number(b.limit) || 100));
       return send(res, 200, out);
+    }
+    if (u.pathname === '/api/admin/gemini-test' && req.method === 'POST') {
+      const b = await body(req);
+      if (!ADMIN || b.token !== ADMIN) return send(res, 403, { error: 'forbidden' });
+      const info = { key_present: !!KEY, key_len: (KEY || '').length, key_starts_ai: (KEY || '').startsWith('AIza') };
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEN_MODELS[0]}:generateContent`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
+          body: JSON.stringify({ contents: [{ parts: [{ text: 'قل: تم' }] }] }),
+        });
+        info.generate_status = r.status;
+        if (r.ok) { const j = await r.json(); info.generate_ok = !!(j.candidates && j.candidates[0]); }
+        else info.generate_err = (await r.text()).slice(0, 200);
+      } catch (e) { info.generate_err = String(e.message); }
+      return send(res, 200, info);
     }
     if (u.pathname === '/api/admin/status' && req.method === 'POST') {
       const b = await body(req);
