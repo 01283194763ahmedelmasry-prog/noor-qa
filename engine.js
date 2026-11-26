@@ -213,12 +213,15 @@ export function answer(D, T, q, kw) {
     if ((total >= 2 && cw.size / total <= 0.5) || unk.length) topics = [];
   }
   const gen = topics.length ? searchLocal(D, q, kw, 8, 8, 0.34) : searchLocal(D, q, kw, 8, 8, 0.6, true);
-  if (!topics.length) return { topics: [], ...gen };
+  if (!topics.length) return { topics: [], facts: [], ...gen };
   const ayahs = [], seenA = new Set(), hads = [], seenH = new Set();
   const hl = topics.map((t) => topicHadiths(D, t, q, 5));
   const al = topics.map((t) => t.ay.slice(0, 5));
   for (let i = 0; i < 8; i++) for (const l of al) if (l[i] && !seenA.has(l[i]) && ayahs.length < 5) { seenA.add(l[i]); ayahs.push({ id: l[i], curated: true }); }
   for (let i = 0; i < 6; i++) for (const l of hl) if (l[i] && !seenH.has(l[i].id) && hads.length < 5) { seenH.add(l[i].id); hads.push(l[i]); }
   if (hads.length < 3) for (const h of gen.hadiths) if (hads.length < 4 && !seenH.has(h.id)) { seenH.add(h.id); hads.push(h); }
-  return { topics: topics.map((t) => t.name), ayahs, hadiths: hads };
+  // Curated fact answers (encyclopedic Quran facts): hand-written by the maintainer with their
+  // source citation; never LLM-generated. Shown alongside the verified texts, not instead of them.
+  const facts = topics.filter((t) => t.fa).map((t) => ({ text: t.fa, src: t.fas || '', url: t.fau || '' }));
+  return { topics: topics.map((t) => t.name), facts, ayahs, hadiths: hads };
 }
