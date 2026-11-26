@@ -35,6 +35,9 @@
   .tafsir, .explanation { display: none; border-top: 1px dashed var(--line); margin-top: 12px; padding-top: 12px; color: var(--dim); font-size: 15px; line-height: 2; white-space: pre-wrap; }
   .tafsir h4, .explanation h4 { color: var(--dim); font-size: 13px; margin-bottom: 6px; }
   .src { display: inline-block; margin-top: 10px; color: var(--dim); font-size: 13px; text-decoration: none; border-bottom: 1px dotted var(--dim); }
+  .card.fact { border-color: var(--gold); background: #201d14; }
+  .fact-text { font-size: 18px; line-height: 2; color: var(--ink); }
+  .fact-src { margin-top: 10px; color: var(--dim); font-size: 13px; }
   .src:hover { color: var(--gold); }
   footer { text-align: center; color: var(--dim); font-size: 13px; line-height: 1.9; margin-top: 34px; border-top: 1px solid var(--line); padding-top: 16px; }
   .spin { text-align: center; color: var(--dim); padding: 24px; }
@@ -60,7 +63,7 @@
 <script>
 const $ = (s) => document.querySelector(s);
 const out = $('#out'), q = $('#q'), go = $('#go');
-const SUGGEST = ['كيف أتوضأ؟', 'ما فضل الصبر؟', 'حكم صلاة الفجر', 'فضل قراءة سورة الكهف', 'بر الوالدين', 'أهمية النية في العمل', 'فضل صدقة السر', 'ما قيمة الدنيا عند الله؟'];
+const SUGGEST = ['كيف أتوضأ؟', 'ما فضل الصبر؟', 'حكم صلاة الفجر', 'فضل قراءة سورة الكهف', 'بر الوالدين', 'أهمية النية في العمل', 'فضل صدقة السر', 'أطول سورة في القرآن؟'];
 $('#chips').innerHTML = SUGGEST.map((s) => `<span class="chip">${s}</span>`).join('');
 document.querySelectorAll('.chip').forEach((c) => c.onclick = () => { q.value = c.textContent; doSearch(); });
 go.onclick = doSearch;
@@ -87,6 +90,15 @@ function render(j) {
   if (j.fatwa) { fw = `<div class="msg warn">${esc(j.fatwa)}</div>`; if (!(j.ayahs && j.ayahs.length) && !(j.hadiths && j.hadiths.length)) { out.innerHTML = fw; return; } }
   if (j.none) { out.innerHTML = '<div class="msg">لم نجد نصًا موثقًا يجيب على هذا السؤال في المصادر المتاحة حاليًا. جرب صياغة أخرى أو كلمات أبسط.</div>'; return; }
   let h = '';
+  if (j.facts && j.facts.length) {
+    for (const f of j.facts) {
+      h += `<div class="card fact">
+        <div class="ref">الجواب المختصر</div>
+        <div class="fact-text">${esc(f.text)}</div>
+        ${f.src ? `<div class="fact-src">المصدر: ${esc(f.src)}${f.url ? ` — <a class="src" style="margin-top:0" href="${esc(f.url)}" target="_blank" rel="noopener">تحقق ↗</a>` : ''}</div>` : ''}
+      </div>`;
+    }
+  }
   if (j.ayahs && j.ayahs.length) {
     h += '<h2 class="sec">من القرآن الكريم</h2>';
     for (const a of j.ayahs) {
