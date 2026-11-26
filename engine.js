@@ -11,7 +11,7 @@ export const norm = (s) => String(s || '')
   .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '')
   .replace(/[إأآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
   .replace(/[^\u0621-\u064A0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-const STOP = new Set('كيف ما ماذا هل هو هي هم من في علي الي عن او ان لا اذا اذ ثم قد لم لن كل هذا هذه ذلك التي الذي الذين انا انت نحن انه انها كان كانت يكون تكون ايه ازاي ليه امتي فين مين يعني بتاع حكم معني ماهو ماهي لماذا متي اين يجب ينبغي عند بين مع كما بل لو ام اي ايها يا الا غير بعد قبل حتي'.split(' '));
+const STOP = new Set('كيف ما ماذا هل هو هي هم من في علي الي عن او ان لا اذا اذ ثم قد لم لن كل هذا هذه ذلك التي الذي الذين انا انت نحن انه انها كان كانت يكون تكون ايه ازاي ليه امتي فين مين يعني بتاع حكم معني ماهو ماهي لماذا متي اين يجب ينبغي عند بين مع كما بل لو ام اي ايها يا الا غير بعد قبل حتي اللي'.split(' '));
 const PRE = ['وبال', 'وال', 'بال', 'كال', 'فال', 'لل', 'ال', 'ول', 'وب', 'و', 'ب', 'ل', 'ف'];
 const SUF = ['ات', 'ون', 'ين', 'ان', 'ها', 'هم', 'هن', 'كم', 'نا', 'ه', 'ي'];
 export function stem(w) {
@@ -69,7 +69,15 @@ export function loadData(dir = 'data') {
   for (const r of A) aix.add([[r[2], 1.5], [r[4], 2], [r[5], 0.7]]);
   aix.done();
   const aById = new Map(A.map((r, i) => [r[0], i]));
-  return { H, hids, hix, A, aix, aById };
+  // Word-frequency index over the bundled Tanzil text (normalized: no diacritics, unified hamzas):
+  // powers the word-count answers, computed from the corpus itself, never invented.
+  const wf = new Map(), wAy = new Map();
+  for (let i = 0; i < A.length; i++) for (const w of norm(A[i][4]).split(' ')) {
+    if (!w) continue;
+    wf.set(w, (wf.get(w) || 0) + 1);
+    let a = wAy.get(w); if (!a) wAy.set(w, a = []); if (a.length < 5) a.push(i);
+  }
+  return { H, hids, hix, A, aix, aById, wf, wAy };
 }
 
 function queryTerms(q, kw) {
@@ -84,7 +92,7 @@ function rank(ix, qt, k, minFrac) {
   const arr = [...sc].map(([d, s]) => [d, s * (0.4 + 0.6 * Math.min(1, (hit.get(d) / tot) * 2.2)), hit.get(d) / tot]).sort((a, b) => b[1] - a[1]);
   return arr.slice(0, k);
 }
-const FILL = new Set(['كام', 'كم', 'عدد', 'عده', 'عايز', 'عاوز', 'اعرف', 'ممكن', 'سمحت', 'اشرح', 'اشرحلي', 'قولي', 'بالتفصيل', 'نصيحه', 'رايك', 'كلام', 'موضوع', 'سوال', 'ابغي', 'اريد', 'احتاج', 'محتاج', 'عندي', 'مشكله', 'اسال', 'اسأل', 'معلومات', 'تفاصيل', 'بخصوص', 'عن', 'الاسلام', 'اسلام', 'شرعا', 'شرعي', 'الشرع', 'الشريعه', 'الدين', 'الاسلاميه', 'مسلم', 'القران', 'السنه', 'الاحاديث', 'حديث', 'ايه', 'اية', 'آية', 'الايات', 'ايات', 'دليل', 'يوجد', 'موجود', 'موجوده', 'يحدث', 'يصير', 'يحصل', 'تقول', 'يقال', 'نقول', 'اقول'].map((x) => stem(norm(x))));
+const FILL = new Set(['كام', 'كم', 'عدد', 'عده', 'عايز', 'عاوز', 'اعرف', 'ممكن', 'سمحت', 'اشرح', 'اشرحلي', 'قولي', 'بالتفصيل', 'نصيحه', 'رايك', 'كلام', 'موضوع', 'سوال', 'ابغي', 'اريد', 'احتاج', 'محتاج', 'عندي', 'مشكله', 'اسال', 'اسأل', 'معلومات', 'تفاصيل', 'بخصوص', 'عن', 'الاسلام', 'اسلام', 'شرعا', 'شرعي', 'الشرع', 'الشريعه', 'الدين', 'الاسلاميه', 'مسلم', 'القران', 'السنه', 'الاحاديث', 'حديث', 'ايه', 'اية', 'آية', 'الايات', 'ايات', 'دليل', 'يوجد', 'موجود', 'موجوده', 'يحدث', 'يصير', 'يحصل', 'تقول', 'يقال', 'نقول', 'اقول', 'فلوس', 'فلوسي', 'الفلوس', 'كيلو', 'كيلوجرام', 'جرام', 'بنك', 'بنكي', 'تماني', 'تمانيه', 'فضل', 'ثواب', 'اجر', 'ضلها', 'ضل', 'البنكي', 'بنكيه'].map((x) => stem(norm(x)))); FILL.add('بنكي');
 // Modern / out-of-scope / ambiguous concepts: the corpus has a same-spelled word with a different meaning, so answer nothing.
 const OUT = new Set(['سحر', 'سحره', 'ساحر', 'تامين', 'تامينات', 'بيتكوين', 'بتكوين', 'كريبتو', 'اسهم', 'بورصه', 'فوركس', 'تداول', 'تبرع', 'اسم', 'مرحبا', 'اهلا', 'هلا', 'شكرا', 'تمام', 'اوكي', 'موسيقي', 'اغاني', 'غناء', 'تصوير', 'فيديو', 'انترنت', 'فيس', 'فيسبوك', 'يوتيوب', 'تجميل', 'جراحه', 'تطعيم', 'لقاح', 'يانصيب', 'قمار', 'سياره', 'موبايل', 'كمبيوتر', 'برمجه', 'لعبه', 'العاب', 'كره', 'ماتش', 'بنك', 'بنوك', 'قهوه', 'شاي', 'تدخين', 'سيجاره', 'شيشه'].map((x) => stem(norm(x))));
 const OUT_PH = ['النوم بعد الفجر', 'النوم بعد صلاه الفجر', 'نوم بعد الفجر'];
@@ -201,7 +209,35 @@ export function topicHadiths(D, topic, q, k = 6) {
   }
   return out;
 }
+// Word-frequency counting over the bundled Tanzil text: answers "اللفظ/كلمة X ذُكر كام مرة في القرآن"
+// with a count computed from the bundled corpus itself (never invented), and states the count basis.
+const COUNT_Q = /مر[ها]/, COUNT_VERB = /(ذكر|اتذكر|مذكور|ورد|اتقال|تكرر|مكرر|موجود|مكتوب|لفظ|كلمه|كلمات|اسم)/, COUNT_IN = /(قران|قرءان|مصحف|كتاب الله)/;
+const COUNT_SKIP = new Set('لفظ لفظه كلمه كلمات اسم ذكر اتذكر اتذكرت مذكور مذكوره ورد وردت اتقال اتقالت تكرر تكررت مكرر مكرره موجود موجوده مكتوب مكتوبه كام كم مره مرات عدد في القران القرءان الكريم المصحف كتاب ايه ازاي هو هي بتاع بيتقال جه جات نزلت'.split(' '));
+const COUNT_PRE = ['وال', 'بال', 'كال', 'فال', 'لل', 'وب', 'وك', 'ول', 'يا', 'ال', 'و', 'ب', 'ل', 'ك', 'ف'];
+function wordCount(D, q) {
+  const nq = norm(q);
+  if (!COUNT_Q.test(nq) || !COUNT_IN.test(nq) || !COUNT_VERB.test(nq)) return null;
+  let raw = null, explicit = false;
+  const m = q.match(/(?:لفظ|لفظة|كلمة|كلمات|اسم)\s+([^\s?؟!,،.:]+)/u);
+  if (m) { raw = m[1]; explicit = true; }
+  else { for (const w of nq.split(' ')) if (w.length >= 3 && !COUNT_SKIP.has(w) && !STOP.has(w)) { raw = w; break; } }
+  if (!raw) return null;
+  let t = norm(raw), rasm = null;
+  if (t.length < 2) return null;
+  if (!D.wf.get(t) && t.endsWith('اه')) { const t2 = t.slice(0, -2) + 'وه'; if (D.wf.get(t2)) { t = t2; rasm = raw.slice(0, raw.search(/[ةا][^ةا]*$/) + 1); } }
+  const n = D.wf.get(t) || 0;
+  if (!n && !explicit) return null; // uncertain extraction + zero hits: keep the honest fallback
+  let pref = 0;
+  for (const [k, c] of D.wf) if (k !== t && k.endsWith(t) && COUNT_PRE.includes(k.slice(0, k.length - t.length))) pref += c;
+  const ay = (D.wAy.get(t) || []).map((i) => ({ id: D.A[i][0], score: 50, curated: true }));
+  const text = n
+    ? `كلمة «${raw}» وردت بلفظها ${n} مرة في المصحف${rasm ? ' (برسم المصحف)' : ''}${pref ? `، ومع أدوات الربط مثل «و${raw}» ${pref} مرة أخرى` : ''}. العدّ آلي للّفظ نفسه بعد حذف التشكيل وتوحيد الهمزات، ولا يشمل المشتقات أو صيغ الجذر الأخرى.`
+    : `لفظ «${raw}» لم يرد في المصحف بهذا اللفظ. العدّ آلي من نص المصحف بعد حذف التشكيل وتوحيد الهمزات.`;
+  return { topics: [], facts: [{ text, src: 'المصحف - عدّ آلي من نص Tanzil', url: '' }], ayahs: ay, hadiths: [] };
+}
 export function answer(D, T, q, kw) {
+  const wc = wordCount(D, q);
+  if (wc) return wc;
   let topics = matchTopics(T, q);
   // Coverage gate: if matched topics explain under half of the question's content terms,
   // the question is about something more specific than the topic; do not return generic topic texts.
