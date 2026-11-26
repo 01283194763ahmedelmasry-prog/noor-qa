@@ -71,6 +71,7 @@ async function search(q) {
   const r = answer(D, TOPICS, q, kw);
   return {
     topics: r.topics,
+    facts: r.facts || [],
     ayahs: r.ayahs.map(({ id }) => { const x = D.A[D.aById.get(id)]; return { id, ref: x[2] + ' ' + x[3], text: x[4], tafsir: x[5], url: 'https://quran.com/' + id.replace(':', '/') }; }),
     hadiths: r.hadiths.map(({ id }) => { const x = D.H[id]; return { id, ref: x[0] + ' - ' + x[1], matn: x[3] || x[4], sanad: x[3] ? x[4] : '', chapter: x[2], grade: 'صحيح', url: x[5] || ('https://sunnah.com/' + id) }; }),
   };
@@ -196,7 +197,7 @@ http.createServer(async (req, res) => {
       if (fat && !/ميراث|ورث|إرث|ارث|تركة|فرائض/.test(q)) return send(res, 200, { fatwa: FATWA_MSG, ayahs: [], hadiths: [] });
       const out = await search(q);
       if (fat) out.fatwa = FATWA_MSG;
-      if (!out.ayahs.length && !out.hadiths.length) return send(res, 200, { none: true, ayahs: [], hadiths: [] });
+      if (!out.ayahs.length && !out.hadiths.length && !(out.facts && out.facts.length)) return send(res, 200, { none: true, ayahs: [], hadiths: [] });
       return send(res, 200, out);
     }
     if (u.pathname === '/api/explain' && req.method === 'POST') {
