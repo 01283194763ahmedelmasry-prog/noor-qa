@@ -89,7 +89,9 @@ const FILL = new Set(['كام', 'كم', 'عدد', 'عده', 'عايز', 'عاو�
 const OUT = new Set(['سحر', 'سحره', 'ساحر', 'تامين', 'تامينات', 'بيتكوين', 'بتكوين', 'كريبتو', 'اسهم', 'بورصه', 'فوركس', 'تداول', 'تبرع', 'اسم', 'مرحبا', 'اهلا', 'هلا', 'شكرا', 'تمام', 'اوكي', 'موسيقي', 'اغاني', 'غناء', 'تصوير', 'فيديو', 'انترنت', 'فيس', 'فيسبوك', 'يوتيوب', 'تجميل', 'جراحه', 'تطعيم', 'لقاح', 'يانصيب', 'قمار', 'سياره', 'موبايل', 'كمبيوتر', 'برمجه', 'لعبه', 'العاب', 'كره', 'ماتش', 'بنك', 'بنوك', 'قهوه', 'شاي', 'تدخين', 'سيجاره', 'شيشه'].map((x) => stem(norm(x))));
 const OUT_PH = ['النوم بعد الفجر', 'النوم بعد صلاه الفجر', 'نوم بعد الفجر'];
 export function searchLocal(D, q, kw, ka = 8, kh = 8, minFrac = 0.34, strict = false) {
-  const qt = queryTerms(q, kw);
+  // Strict (no-topic) mode ignores Gemini expansion keywords: their extra weight dilutes
+  // hit fractions and flaps borderline answers between runs; only the asked terms count.
+  const qt = strict ? queryTerms(q, []) : queryTerms(q, kw);
   if (!qt.size) return { ayahs: [], hadiths: [] };
   if (strict) {
     // Fail-safe: a question about something the corpus does not contain yields no text, and every
