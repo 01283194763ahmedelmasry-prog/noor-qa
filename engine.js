@@ -202,7 +202,7 @@ export function topicHadiths(D, topic, q, k = 6) {
   cand.sort((a, b) => b[1] - a[1]);
   const per = new Map(), out = [];
   for (const id of topic.hf || []) if (D.H[id] && out.length < k) { out.push({ id, score: 99, curated: true }); per.set(D.H[id][2], (per.get(D.H[id][2]) || 0) + 1); }
-  if (topic.strict && out.length) return out; // curated-only topics: never pad with keyword-chapter matches
+  if ((topic.strict && out.length) || topic.nopad) return out; // curated-only topics: never pad with keyword-chapter matches
   if (out.length >= 3) return out; // curated hadiths already answer it: no keyword tail
   const top = cand.length ? cand[0][1] : 0;
   for (const [d, s] of cand) {
@@ -267,7 +267,7 @@ export function answer(D, T, q, kw) {
   const al = topics.map((t) => t.ay.slice(0, 5));
   for (let i = 0; i < 8; i++) for (const l of al) if (l[i] && !seenA.has(l[i]) && ayahs.length < 5) { seenA.add(l[i]); ayahs.push({ id: l[i], curated: true }); }
   for (let i = 0; i < 6; i++) for (const l of hl) if (l[i] && !seenH.has(l[i].id) && hads.length < 5) { seenH.add(l[i].id); hads.push(l[i]); }
-  if (hads.length < 3 && !topics.some((t) => t.strict)) for (const h of gen.hadiths) if (hads.length < 4 && !seenH.has(h.id)) { seenH.add(h.id); hads.push(h); }
+  if (hads.length < 3 && !topics.some((t) => t.strict || t.nopad)) for (const h of gen.hadiths) if (hads.length < 4 && !seenH.has(h.id)) { seenH.add(h.id); hads.push(h); }
   // Curated fact answers (encyclopedic Quran facts): hand-written by the maintainer with their
   // source citation; never LLM-generated. Shown alongside the verified texts, not instead of them.
   const facts = topics.filter((t) => t.fa).map((t) => ({ text: t.fa, src: t.fas || '', url: t.fau || '' }));
@@ -278,4 +278,4 @@ export function nearestTopics(T, q, n = 1) {
   const qt = new Set(toks(q));
   return T.map((t) => { const tt = new Set(toks([t.name, ...(t.trig || [])].join(' '))); let s = 0; for (const w of qt) if (tt.has(w)) s++; return [t, s]; })
     .filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, n).map((x) => x[0]);
-                                                                             }
+}
