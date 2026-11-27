@@ -281,7 +281,7 @@ export function answer(D, T, q, kw) {
   const al = topics.map((t) => t.ay.slice(0, 5));
   for (let i = 0; i < 8; i++) for (const l of al) if (l[i] && !seenA.has(l[i]) && ayahs.length < 5) { seenA.add(l[i]); ayahs.push({ id: l[i], curated: true }); }
   for (let i = 0; i < 6; i++) for (const l of hl) if (l[i] && !seenH.has(l[i].id) && hads.length < 5) { seenH.add(l[i].id); hads.push(l[i]); }
-  if (hads.length < 3 && !topics.some((t) => t.strict || t.nopad)) for (const h of gen.hadiths) if (hads.length < 4 && !seenH.has(h.id)) { seenH.add(h.id); hads.push(h); }
+  if (hads.length < 3 && !topics.some((t) => t.strict || t.nopad)) for (const h of gen.hadiths) if (hads.length < 4 && !seenH.has(h.id) && relevantHadiths(D, q, [h.id]).length) { seenH.add(h.id); hads.push(h); }
   // Curated fact answers (encyclopedic Quran facts): hand-written by the maintainer with their
   // source citation; never LLM-generated. Shown alongside the verified texts, not instead of them.
   const facts = topics.filter((t) => t.fa).map((t) => ({ text: t.fa, src: t.fas || '', url: t.fau || '' }));
