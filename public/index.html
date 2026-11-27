@@ -20,7 +20,7 @@
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
   .chip { background: var(--card); border: 1px solid var(--line); color: var(--dim); border-radius: 999px; padding: 7px 14px; font-size: 14px; cursor: pointer; }
   .chip:hover { color: var(--ink); border-color: var(--gold); }
-  .sections { display:grid; grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:8px; margin: 4px 0 8px; }
+  .sections { display:grid; grid-template-columns:repeat(auto-fit,minmax(88px,1fr)); gap:8px; margin: 4px 0 8px; }
   .sec-btn { min-width:0; background: var(--card); border:1px solid var(--line); color: var(--ink); border-radius: 12px; padding: 10px; font-size: 16px; line-height:1.4; cursor:pointer; overflow-wrap:anywhere; }
   .sec-btn.on { border-color: var(--gold); color: var(--gold); }
   .subchips { display:none; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
@@ -95,6 +95,7 @@
     .search button { padding: 0 16px; font-size: 16px; }
     .sections { grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .sec-btn { padding: 8px 4px; font-size: 14px; }
+    .sec-btn:last-child:nth-child(3n+1) { grid-column: 1 / -1; }
     .chip { padding: 6px 11px; font-size: 13px; }
     .card { padding: 14px; }
     .ayah-text { font-size: 21px; }
