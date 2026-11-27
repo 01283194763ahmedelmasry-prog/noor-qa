@@ -13,15 +13,15 @@
   header h1 { font-size: 44px; color: var(--gold); letter-spacing: 1px; }
   header p { color: var(--dim); margin-top: 6px; font-size: 15px; }
   .search { display: flex; gap: 8px; margin: 18px 0 10px; }
-  .search input { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; color: var(--ink); font-size: 17px; outline: none; }
+  .search input { flex: 1; min-width:0; width:100%; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; color: var(--ink); font-size: 17px; outline: none; }
   .search input:focus { border-color: var(--gold); }
   .search button { background: var(--gold); color: #141a15; border: 0; border-radius: 12px; padding: 0 22px; font-size: 17px; font-weight: 700; cursor: pointer; }
   .search button:disabled { opacity: .6; cursor: default; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
   .chip { background: var(--card); border: 1px solid var(--line); color: var(--dim); border-radius: 999px; padding: 7px 14px; font-size: 14px; cursor: pointer; }
   .chip:hover { color: var(--ink); border-color: var(--gold); }
-  .sections { display:flex; gap:8px; margin: 4px 0 8px; }
-  .sec-btn { flex:1; background: var(--card); border:1px solid var(--line); color: var(--ink); border-radius: 12px; padding: 10px; font-size: 16px; cursor:pointer; }
+  .sections { display:grid; grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:8px; margin: 4px 0 8px; }
+  .sec-btn { min-width:0; background: var(--card); border:1px solid var(--line); color: var(--ink); border-radius: 12px; padding: 10px; font-size: 16px; line-height:1.4; cursor:pointer; overflow-wrap:anywhere; }
   .sec-btn.on { border-color: var(--gold); color: var(--gold); }
   .subchips { display:none; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
   .subchips.on { display:flex; }
@@ -82,6 +82,24 @@
   .fact-src { margin-top: 10px; color: var(--dim); font-size: 13px; }
   .src:hover { color: var(--gold); }
   footer { text-align: center; color: var(--dim); font-size: 13px; line-height: 1.9; margin-top: 34px; border-top: 1px solid var(--line); padding-top: 16px; }
+  html, body { overflow-x: hidden; max-width: 100%; }
+  .wrap, .card, .story, .msg, .n99, .hisn, .mg, .hc { min-width: 0; overflow-wrap: anywhere; }
+  .search button { flex: 0 0 auto; }
+  .chip { max-width: 100%; text-align: center; }
+  @media (max-width: 480px) {
+    .wrap { padding: 12px 12px 48px; }
+    header { padding: 16px 0 12px; }
+    header h1 { font-size: 36px; }
+    header p { font-size: 14px; line-height: 1.8; }
+    .search input { padding: 12px 12px; font-size: 16px; }
+    .search button { padding: 0 16px; font-size: 16px; }
+    .sections { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .sec-btn { padding: 8px 4px; font-size: 14px; }
+    .chip { padding: 6px 11px; font-size: 13px; }
+    .card { padding: 14px; }
+    .ayah-text { font-size: 21px; }
+    .hadith-text { font-size: 17px; }
+  }
   .spin { text-align: center; color: var(--dim); padding: 24px; }
 </style>
 </head>
