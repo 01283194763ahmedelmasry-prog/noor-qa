@@ -240,6 +240,7 @@ function render(j) {
   }
   const ayHtml = h; h = '';
   const hdList = (j.hadiths || []).filter((x) => !mgHad.has(x.id));
+  if (!hdList.length && j.nohadith) h += '<div class="msg">لم أجد في الصحيحين حديثًا يجيب عن سؤالك مباشرة، ولذلك لا أعرض حديثًا غير مرتبط به.</div>';
   if (hdList.length) {
     h += '<h2 class="sec">من السنة النبوية' + (j.closest ? ' (أقرب نص موثق، وقد لا يجيب عن السؤال مباشرة)' : '') + '</h2>';
     for (const x of j.hadiths.filter((x) => !mgHad.has(x.id))) {
