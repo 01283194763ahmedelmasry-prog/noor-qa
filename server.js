@@ -5,7 +5,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadData, loadTopics, answer, nearestTopics, searchLocal, norm } from './engine.js';
+import { loadData, loadTopics, answer, nearestTopics, searchLocal, norm, relevantHadiths } from './engine.js';
 import { hisnMatch, hisnPublic } from './hisn.js';
 const D = loadData(), TOPICS = loadTopics();
 let N99 = []; try { N99 = JSON.parse(fs.readFileSync(new URL('./data/names99.json', import.meta.url), 'utf8')); } catch {}
@@ -114,6 +114,7 @@ function lastResort(q, out) {
     try { const g = searchLocal(D, q, [], 4, 4, 0.05, false); res.ayahs = (g.ayahs || []).map(({ id }) => pubA(id)); res.hadiths = (g.hadiths || []).map(({ id }) => pubH(id)); } catch {}
   }
   if (!res.ayahs.length && !res.hadiths.length) { res.ayahs = (out && out.ayahs) || []; res.hadiths = (out && out.hadiths) || []; }
+  { const okIds = new Set(relevantHadiths(D, q, res.hadiths.map((h) => h.id))); res.hadiths = res.hadiths.filter((h) => okIds.has(h.id)); }
   if (!res.ayahs.length && !res.hadiths.length) res.suggest = TOPICS.filter((t) => t.ch).slice(0, 400).sort(() => Math.random() - 0.5).slice(0, 8).map((t) => t.name);
   return res;
 }
@@ -157,12 +158,12 @@ async function enrich(q, x) {
       const nt = x.hadiths.length ? [] : nearestTopics(TOPICS, q, 2);
       for (const t of nt) for (const id of (t.hf || []).slice(0, 3)) if (D.H[id] && !x.hadiths.some((h) => h.id === id)) x.hadiths.push(pubH(id));
       if (!x.hadiths.length) { const g = searchLocal(D, q, [], 4, 3, 0.05, false); x.hadiths = (g.hadiths || []).slice(0, 3).map(({ id }) => pubH(id)); }
-      if (!x.hadiths.length && D.H['bukhari:71']) x.hadiths = [pubH('bukhari:71')];
-    } catch {}
-    if (x.hadiths.length) x.closest = true;
+      { const okIds = new Set(relevantHadiths(D, q, x.hadiths.map((h) => h.id))); x.hadiths = x.hadiths.filter((h) => okIds.has(h.id)); }
+    } catch { x.hadiths = []; }
+    if (x.hadiths.length) x.closest = true; else x.nohadith = true;
   }
   if (x.ai && x.ai.text) return x; // already has a labeled AI explanation
-  if (!x.hadiths.length && !x.ayahs.length && !x.facts.length) return x;
+  if (!x.hadiths.length && !x.ayahs.length && !x.facts.length) { if (!(x.ai && x.ai.text) && !x.hisn && !x.names99 && !x.story) x.none = true; return x; }
   const ck = q;
   if (sumCache.has(ck)) { x.summary = sumCache.get(ck); return x; }
   const ctx = [];
