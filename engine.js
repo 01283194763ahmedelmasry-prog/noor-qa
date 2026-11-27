@@ -99,14 +99,16 @@ const OUT_PH = ['النوم بعد الفجر', 'النوم بعد صلاه ال
 
 // Relevance gate for fallback hadiths: a hadith is kept only if its chapter or text contains the question's
 // rarest content word (the distinctive subject). Never show a text that does not mention the subject asked about.
-const GEN2 = new Set(['فضل', 'حكم', 'معني', 'ماهو', 'اهميه', 'ماذا', 'كيف', 'لماذا', 'هل', 'ما', 'هو', 'هي', 'عمل', 'طريقه', 'بعد', 'قبل', 'عند', 'قراءه', 'قرايه', 'سوره', 'ايه', 'اية', 'يجوز', 'حرام', 'حلال']);
+const GEN2 = new Set(['فضل', 'حكم', 'معني', 'ماهو', 'اهميه', 'ماذا', 'كيف', 'لماذا', 'هل', 'ما', 'هو', 'هي', 'عمل', 'طريقه', 'بعد', 'قبل', 'عند', 'قراءه', 'قرايه', 'سوره', 'ايه', 'اية', 'يجوز', 'حرام', 'حلال', 'اذكار', 'ذكر', 'دعاء', 'دعا', 'مرات', 'مره', 'ثلاث']);
+const SYN = [['نوم', 'نام', 'ينام', 'منام', 'نائم', 'مضجع', 'فراش']];
 export function relevantHadiths(D, q, ids) {
-  const qs = [...toks(q)].filter((t) => !FILL.has(t) && !GEN2.has(t) && t.length >= 3);
+  const qs = [...toks(q)].filter((t) => !FILL.has(t) && !GEN2.has(t) && t.length >= 2);
   const known = qs.filter((t) => D.hix.post.has(t));
-  if (!known.length) return [];
-  const df = (t) => (D.hix.post.get(t)?.length || 0);
+  if (!known.length || qs.some((t) => t.length >= 4 && !D.hix.post.has(t) && !D.aix.post.has(t))) return [];
+  const df = (t) => (D.hix.post.get(t)?.length || 0) / D.hix.n;
   const must = [...known].sort((a, b) => df(a) - df(b))[0];
-  return ids.filter((id) => { const h = D.H[id]; if (!h) return false; const tk = toks(h[2] + ' ' + (h[3] || h[4]), true); return tk.includes(must); });
+  const want = new Set([must]); for (const g of SYN) if (g.includes(must)) g.forEach((x) => want.add(stem(x)));
+  return ids.filter((id) => { const h = D.H[id]; if (!h) return false; const tk = toks(h[2] + ' ' + (h[3] || h[4]), true); return tk.some((t) => want.has(t)); });
 }
 export function searchLocal(D, q, kw, ka = 8, kh = 8, minFrac = 0.34, strict = false) {
   // Strict (no-topic) mode ignores Gemini expansion keywords: their extra weight dilutes
