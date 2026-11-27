@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نُور — اسأل في الكتاب والسنة</title>
+<style>
+  :root { --bg:#0f1410; --card:#1a211c; --line:#2c382f; --gold:#c9a959; --ink:#ece7db; --dim:#9aa79d; --green:#3f7d5a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, 'Noto Naskh Arabic', serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { text-align: center; padding: 28px 0 20px; }
+  header h1 { font-size: 44px; color: var(--gold); letter-spacing: 1px; }
+  header p { color: var(--dim); margin-top: 6px; font-size: 15px; }
+  .search { display: flex; gap: 8px; margin: 18px 0 10px; }
+  .search input { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; color: var(--ink); font-size: 17px; outline: none; }
+  .search input:focus { border-color: var(--gold); }
+  .search button { background: var(--gold); color: #141a15; border: 0; border-radius: 12px; padding: 0 22px; font-size: 17px; font-weight: 700; cursor: pointer; }
+  .search button:disabled { opacity: .6; cursor: default; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .chip { background: var(--card); border: 1px solid var(--line); color: var(--dim); border-radius: 999px; padding: 7px 14px; font-size: 14px; cursor: pointer; }
+  .chip:hover { color: var(--ink); border-color: var(--gold); }
+  .sections { display:flex; gap:8px; margin: 4px 0 8px; }
+  .sec-btn { flex:1; background: var(--card); border:1px solid var(--line); color: var(--ink); border-radius: 12px; padding: 10px; font-size: 16px; cursor:pointer; }
+  .sec-btn.on { border-color: var(--gold); color: var(--gold); }
+  .subchips { display:none; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .subchips.on { display:flex; }
+  .subchips.scroll { scrollbar-color:#3a4a40 transparent; max-height:190px; overflow-y:auto; padding:4px; border:1px solid var(--line); border-radius:12px; }
+  .hisn { border:1px dashed #6b7f5e; background:#141c16; border-radius:14px; padding:14px; margin-bottom:14px; }
+  .hisn .hb { display:inline-block; background:#2b3a2d; color:#c9d8b6; border-radius:8px; padding:2px 8px; font-size:12px; margin-inline-start:8px; }
+  .hisn h3 { margin:0 0 10px; font-size:17px; color:#d6e2c4; }
+  .hisn .hi { padding:10px 0; border-top:1px solid #243026; font-size:19px; line-height:2; }
+  .hisn .hi:first-of-type { border-top:0; }
+  .hisn .htk { display:none; color:var(--dim); font-size:13px; line-height:1.9; margin-top:6px; }
+  .hisn .hnote { color:var(--dim); font-size:12px; margin-top:8px; }
+  .secfind { width:100%; box-sizing:border-box; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:8px 10px; font-size:15px; margin-bottom:8px; display:none; }
+  .secfind.on { display:block; }
+  .msg { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; color: var(--dim); margin: 14px 0; line-height: 1.9; }
+  .msg.warn { border-color: #7d5a3f; color: #e0c9a6; }
+  h2.sec { color: var(--gold); font-size: 19px; margin: 22px 0 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 12px; }
+  .card .ref { color: var(--gold); font-size: 14px; margin-bottom: 10px; font-weight: 700; }
+  .ayah-text { font-family: 'Noto Naskh Arabic','Amiri','Traditional Arabic',serif; font-size: 23px; line-height: 2.2; }
+  .hadith-text { font-size: 18px; line-height: 2.2; white-space: pre-wrap; }
+  .hadith-text.clamp { max-height: 11.5em; overflow: hidden; position: relative; -webkit-mask-image: linear-gradient(#000 75%, transparent); mask-image: linear-gradient(#000 75%, transparent); }
+  .sanad { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); color: var(--dim); font-size: 14px; line-height: 2; }
+  .badge { display: inline-block; background: var(--green); color: #eaf4ee; border-radius: 6px; padding: 2px 10px; font-size: 13px; margin-inline-start: 8px; }
+  .toggle, .explain-btn { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 8px; padding: 6px 14px; margin-top: 12px; font-size: 14px; cursor: pointer; }
+  .toggle:hover, .explain-btn:hover { color: var(--gold); border-color: var(--gold); }
+  .tafsir, .explanation { display: none; border-top: 1px dashed var(--line); margin-top: 12px; padding-top: 12px; color: var(--dim); font-size: 15px; line-height: 2; white-space: pre-wrap; }
+  .tafsir h4, .explanation h4 { color: var(--dim); font-size: 13px; margin-bottom: 6px; }
+  .ai-note { font-size: 12px; opacity: .85; }
+  .fact-text { white-space: pre-wrap; }
+  .src { display: inline-block; margin-top: 10px; color: var(--dim); font-size: 13px; text-decoration: none; border-bottom: 1px dotted var(--dim); }
+  .card.fact { border-color: var(--gold); background: #201d14; }
+  .fact-text { font-size: 18px; line-height: 2; color: var(--ink); }
+  .fact-src { margin-top: 10px; color: var(--dim); font-size: 13px; }
+  .src:hover { color: var(--gold); }
+  footer { text-align: center; color: var(--dim); font-size: 13px; line-height: 1.9; margin-top: 34px; border-top: 1px solid var(--line); padding-top: 16px; }
+  .spin { text-align: center; color: var(--dim); padding: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>نُور</h1>
+    <p>اسأل أي سؤال، ونُور يلاقي لك الآيات والأحاديث الصحيحة المتعلقة بموضوعك، بالمصدر والدرجة</p>
+  </header>
+  <div class="search">
+    <input id="q" type="text" placeholder="مثال: كيف أتوضأ؟ ما فضل الصبر؟" enterkeyhint="search">
+    <button id="go">ابحث</button>
+  </div>
+  <div class="sections" id="sections"></div>
+  <input class="secfind" id="secfind" placeholder="ابحث في القسم…" autocomplete="off">
+  <div class="subchips" id="subchips"></div>
+  <div class="chips" id="chips"></div>
+  <div id="out"></div>
+  <footer>
+    نُور بيلاقي لك النصوص الموثقة المتعلقة بسؤالك: القرآن الكريم (بتفسير التفسير الميسّر) وصحيح البخاري ومسلم، مع المصدر والرقم ودرجة الحديث.<br>
+    هذا التطبيق مصدر للنصوص الموثقة وليس بديلًا عن الفتوى من عالم مؤهل. للحالات الشخصية (طلاق، ميراث، وغيرها) اسأل عالمًا موثوقًا.
+  </footer>
+</div>
+<script src="/salah.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const out = $('#out'), q = $('#q'), go = $('#go');
+const SUGGEST = ['تعلّم الصلاة', 'اتجاه القبلة', 'كيف أتوضأ؟', 'ما فضل الصبر؟', 'حكم صلاة الفجر', 'فضل قراءة سورة الكهف', 'بر الوالدين', 'أهمية النية في العمل', 'فضل صدقة السر', 'أطول سورة في القرآن؟'];
+$('#chips').innerHTML = SUGGEST.map((s) => `<span class="chip">${s}</span>`).join('');
+document.querySelectorAll('.chip').forEach((c) => c.onclick = () => { q.value = c.textContent; doSearch(); });
+const SECTIONS = { 'أذكار': ['أذكار الصباح والمساء','أذكار النوم','أذكار بعد الصلاة','سيد الاستغفار','فضل التسبيح والتهليل','فضل الذكر','أذكار الاستيقاظ من النوم','الذكر قبل الوضوء','الذكر بعد الفراغ من الوضوء','الذكر عند الخروج من المنزل','الذكر عند الدخول المنزل','أذكار الأذان','التشهد','الصلاة على النبي صلى الله عليه وسلم بعد التشهد','الدعاء بعد التشهد الأخير وقبل السلام','الأذكار بعد السلام من الصلاة','الذكر عقب السلام من الوتر','الذكر بعد نزول المطر','التكبير والتسبيح في سير السفر','ذكر الرجوع من السفر','فضل الصلاة على النبي صلى الله عليه وسلم','التكبيرة إذا أتي الركن الأسود','الذكر عند المشعر الحرام','التكبيرة عند رمي الجمار مع كل حصاة','الاستغفار والتوبة','فضل التسبيح والتحميد ، والتهليل ، والتكبير'], 'قصص': ['قصة آدم','قصة إدريس','قصة نوح','قصة هود','قصة صالح','قصة إبراهيم','قصة لوط','قصة إسماعيل','قصة إسحاق ويعقوب','قصة يوسف','قصة شعيب','قصة أيوب','قصة ذو الكفل','قصة موسى','قصة هارون','قصة الخضر','قصة داود','قصة سليمان','قصة يونس','قصة زكريا','قصة يحيى','قصة مريم','قصة عيسى','قصة بدء الوحي','قصة ذو القرنين','قصة يأجوج ومأجوج','أصحاب الكهف','أصحاب الفيل','قصة لقمان','قصة قارون','أصحاب الجنة','أصحاب السبت','قصة طالوت وجالوت','قصة بلقيس','قصة قوم سبأ','قصة مؤمن آل فرعون','قصة امرأة فرعون','أصحاب الأخدود','أصحاب الغار','الأبرص والأعمى والأقرع','قصة جريج','الهجرة النبوية','أبو بكر في الغار','قصة إسلام عمر','قصة بلال','قصة عبد الله بن سلام','الثلاثة الذين خُلِّفوا'], 'الأركان': ['أركان الإسلام','أركان الإيمان','الإحسان','أركان الصلاة','فروض الوضوء','اتجاه القبلة'], 'أدعية': ['دعاء الكرب','دعاء السفر','الاستعاذة من عذاب القبر','دعاء قبل السلام','صلاة الاستخارة','دعاء لبس الثوب','دعاء لبس الثوب الجديد','الدعاء لمن لبس ثوباً جديداً','ما يقول إذا وضع الثوب','دعاء دخول الخلاء','دعاء الخروج من الخلاء','دعاء الذهاب إلى المسجد','دعاء دخول المسجد','دعاء الخروج من المسجد','دعاء الاستفتاح','دعاء الركوع','دعاء الرفع من الركوع','دعاء السجود','دعاء الجلسة بين السجدتين','دعاء سجود التلاوة','دعاء صلاة الاستخارة','الدعاء إذا تقلب ليلاً','دعاء القلق والفزع في النوم ومن بلي بالوحشة','ما يفعل من رأى الرؤيا أو الحلم','دعاء قنوت الوتر','دعاء الهم والحزن','دعاء لقاء العدو وذي السلطان','دعاء من خاف ظلم السلطان','الدعاء على العدو','ما يقول من خاف قوماً','دعاء من أصابه شك في الإيمان','الدعاء قضاء الدين','دعاء الوسوسة في الصلاة والقراءة','دعاء من استصعب عليه أمر','ما يقول ويفعل من أذنب ذنباً','دعاء طرد الشيطان ووساوسه','الدعاء حينما يقع مالا يرضاه أو غلب على أمره','تهنئة المولود له وجوابه','ما يعوذ به الأولاد','الدعاء للمريض في عيادته','فضل عيادة المريض','دعاء المريض الذي يئس من حياته','تلقين المحتضر','دعاء من أصيب بمصيبة','الدعاء عند إغماض الميت','الدعاء للميت في الصلاة عليه','الدعاء للفرط في الصلاة عليه','دعاء التعزية','الدعاء عند إدخال الميت القبر','الدعاء بعد دفن الميت','دعاء زيارة القبور','دعاء الريح','دعاء الرعد','من أدعية الاستسقاء','الدعاء إذا نزل المطر','من أدعية الاستصحاء','دعاء رؤية الهلال','الدعاء عند إفطار الصائم','الدعاء قبل الطعام','الدعاء عند الفراغ من الطعام','دعاء الضيف لصاحب الطعام','الدعاء لمن سقاه أو إذا أراد ذلك','الدعاء إذا أفطر عند أهل بيت','دعاء الصائم إذا حضر الطعام ولم يفطر','ما يقول الصائم إذا سابه أحد','الدعاء عند رؤية باكورة الثمر','دعاء العطاس','ما يقالُ للكافر إذا عطس فحمد الله','الدعاء للمتزوج','دعاء المتزوج لنفسه ودعاء شراء الدابة','الدعاء قبل إتيان الزوجة','دعاء الغضب','دعاء من رأى مبتلى','ما يقال في المجلس','كفارة المجلس ومايختم به المجالس','الدعاء لمن قال غفر الله لك','الدعاء لمن صنع إليك معروفاً','ما يعصم به من الدجال','الدعاء لمن قال إني أحبك في الله','الدعاء لمن عرض عليك ماله','الدعاء لمن أقرض عند القضاء','دعاء الخوف من الشرك','الدعاء لمن قال بارك الله فيك','دعاء كراهية الطيرة','دعاء ركوب الدابة','دعاء دخول القرية أو البلدة','دعاء دخول السوق','الدعاء إذا تعس المركوب','دعاء المسافر للمقيم','دعاء المقيم للمسافر','دعاء المسافر إذا أسحر','الدعاء إذا نزل منزلا في سفر أو غيره','ما يقول ويفعل من أتاه أمر يسره أو يكرهه','إفشاء السلام','كيف يرد السلام على الكافر إذا سلم','دعاء صياح الديك ونهيق الحمار','دعاء نباح الكلاب بالليل','الدعاء لمن سببته','ما يقول المسلم إذا مدح المسلم','ما يقول المسلم إذا زكي','كيف يلبي المحرم في الحج أو العمرة','الدعاء بين الركن اليماني والحجر الأسود','دعاء الوقوف على الصفا والمروة','الدعاء يوم عرفة','ما يقول عند التعجب والأمر السار','ما يفعل من أتاه أمر يسره','ما يقول من أحس وجعاً في جسده','دعاء من خشي أن يصيب شيئاً بعينه','ما يقال عند الفزع','ما يقول عند الذبح أو النحر','ما يقول لرد كيد مردة الشياطين','كيف كان النبي صلى الله عليه وسلم يسبح ؟','من أنواع الخير والآداب الجامعة'] };
+$('#sections').innerHTML = Object.keys(SECTIONS).map((k) => `<button class="sec-btn" data-k="${k}">${k}</button>`).join('');
+document.querySelectorAll('.sec-btn').forEach((b) => b.onclick = () => {
+  const on = b.classList.contains('on');
+  document.querySelectorAll('.sec-btn').forEach((x) => x.classList.remove('on'));
+  const sc = $('#subchips'), sf = $('#secfind'); sc.classList.toggle('on', !on); sf.classList.remove('on'); sf.value = '';
+  if (on) return;
+  b.classList.add('on');
+  const items = SECTIONS[b.dataset.k], big = items.length > 8;
+  sc.classList.toggle('scroll', big); sf.classList.toggle('on', big);
+  const draw = (f) => { sc.innerHTML = items.filter((s) => !f || s.includes(f)).map((s) => `<span class="chip">${s}</span>`).join('') || '<span style="color:var(--muted)">لا نتائج</span>';
+    sc.querySelectorAll('.chip').forEach((c) => c.onclick = () => { q.value = c.textContent; doSearch(); }); };
+  sf.oninput = () => draw(sf.value.trim()); draw('');
+});
+go.onclick = doSearch;
+q.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function doSearch() {
+  const query = q.value.trim();
+  if (query.length < 2) return;
+  if (window.noorLesson && window.noorLesson(query, out)) return;
+  go.disabled = true;
+  out.innerHTML = '<div class="spin">بندور في الكتاب والسنة…</div>';
+  try {
+    const r = await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: query }) });
+    const j = await r.json();
+    render(j);
+  } catch (e) {
+    out.innerHTML = '<div class="msg warn">حصلت مشكلة في البحث. جرب تاني.</div>';
+  }
+  go.disabled = false;
+}
+
+function aiCard(j) {
+  if (!(j.ai && j.ai.text)) return '';
+  return `<div class="card fact">
+    <div class="ref">الجواب المختصر</div>
+    <div class="fact-text">${esc(j.ai.text)}</div>
+    <div class="fact-src ai-note">إجابة مولّدة بالذكاء الاصطناعي من خارج المصادر الموثقة في التطبيق.</div>
+  </div>`;
+}
+
+function render(j) {
+  let fw = '';
+  if (j.fatwa) { fw = `<div class="msg warn">${esc(j.fatwa)}</div>`; if (!(j.ayahs && j.ayahs.length) && !(j.hadiths && j.hadiths.length)) { out.innerHTML = fw + aiCard(j); return; } }
+  if (j.none) { out.innerHTML = '<div class="msg">لم نجد نصًا موثقًا يجيب على هذا السؤال في المصادر المتاحة حاليًا. جرب صياغة أخرى أو كلمات أبسط.</div>'; return; }
+  let h = aiCard(j);
+  if (j.facts && j.facts.length) {
+    for (const f of j.facts) {
+      h += `<div class="card fact">
+        <div class="ref">الجواب المختصر</div>
+        <div class="fact-text">${esc(f.text)}</div>
+        ${f.src ? `<div class="fact-src">المصدر: ${esc(f.src)}${f.url ? ` — <a class="src" style="margin-top:0" href="${esc(f.url)}" target="_blank" rel="noopener">تحقق ↗</a>` : ''}</div>` : ''}
+      </div>`;
+    }
+  }
+  if (j.ayahs && j.ayahs.length) {
+    h += '<h2 class="sec">من القرآن الكريم</h2>';
+    for (const a of j.ayahs) {
+      h += `<div class="card">
+        <div class="ref">﴿ سورة ${esc(a.ref)} ﴾</div>
+        <div class="ayah-text">${esc(a.text)}</div>
+        <button class="toggle" data-t="taf-${esc(a.id)}">التفسير الميسّر</button>
+        <a class="src" href="${esc(a.url)}" target="_blank" rel="noopener">المصدر: quran.com ↗</a>
+        <div class="tafsir" id="taf-${esc(a.id)}"><h4>التفسير الميسّر — مجمع الملك فهد:</h4>${esc(a.tafsir)}</div>
+      </div>`;
+    }
+  }
+  if (j.hadiths && j.hadiths.length) {
+    h += '<h2 class="sec">من السنة النبوية</h2>';
+    for (const x of j.hadiths) {
+      h += `<div class="card">
+        <div class="ref">${esc(x.ref)}<span class="badge">${esc(x.grade)}</span></div>
+        ${x.chapter ? `<div style="color:var(--dim);font-size:13px;margin-bottom:8px">${esc(x.chapter)}</div>` : ''}
+        <div class="hadith-text${x.matn.length > 420 ? ' clamp' : ''}" id="ht-${esc(x.id)}">${esc(x.matn)}</div>
+        ${x.matn.length > 420 ? `<button class="toggle more" data-h="ht-${esc(x.id)}">عرض الحديث كاملًا</button>` : ''}
+        ${x.sanad ? `<button class="toggle sn" data-s="sn-${esc(x.id)}">السند</button><div class="sanad" id="sn-${esc(x.id)}">${esc(x.sanad)}</div>` : ''}
+        <button class="explain-btn" data-id="${esc(x.id)}">اشرح المعنى ببساطة</button>
+        <a class="src" href="${esc(x.url)}" target="_blank" rel="noopener">تحقق من المصدر: sunnah.com ↗</a>
+        <div class="explanation" id="ex-${esc(x.id)}"></div>
+      </div>`;
+    }
+  }
+  if (j.hisn && j.hisn.length) {
+    h += '<h2 class="sec">من حصن المسلم</h2>';
+    j.hisn.forEach((c, n) => {
+      h += `<div class="hisn"><h3>${esc(c.title)}<span class="hb">حصن المسلم · ليس من الصحيحين</span></h3>`;
+      for (const t of c.items) h += `<div class="hi">${esc(t)}</div>`;
+      if (c.takhrij && c.takhrij.length) h += `<button class="toggle" data-t="hk-${n}">التخريج كما أورده الكتاب</button><div class="htk" id="hk-${n}">${c.takhrij.map(esc).join('<br>')}${c.gloss && c.gloss.length ? '<br><br>' + c.gloss.map(esc).join('<br>') : ''}</div>`;
+      h += `<div class="hnote">المصدر: «حصن المسلم» لسعيد بن علي بن وهف القحطاني، والنص من نسخة رقمية مجتمعية وقد يحوي أخطاء نسخ؛ الحكم على كل حديث كما في تخريج الكتاب ولم يُراجَع هنا على الصحيحين.</div></div>`;
+    });
+  }
+  out.innerHTML = fw + h;
+  out.querySelectorAll('.toggle[data-t]').forEach((b) => b.onclick = () => { const el = document.getElementById(b.dataset.t); el.style.display = el.style.display === 'block' ? 'none' : 'block'; });
+  out.querySelectorAll('.more').forEach((b) => b.onclick = () => { const el = document.getElementById(b.dataset.h); const open = el.classList.toggle('clamp'); b.textContent = open ? 'عرض الحديث كاملًا' : 'إخفاء'; });
+  out.querySelectorAll('.sn').forEach((b) => b.onclick = () => { const el = document.getElementById(b.dataset.s); el.style.display = el.style.display === 'block' ? 'none' : 'block'; });
+  out.querySelectorAll('.explain-btn').forEach((b) => b.onclick = () => explain(b));
+}
+
+async function explain(b) {
+  const el = document.getElementById('ex-' + b.dataset.id);
+  el.style.display = 'block';
+  el.innerHTML = 'جاري التبسيط…';
+  b.style.display = 'none';
+  try {
+    const r = await fetch('/api/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.dataset.id }) });
+    const j = await r.json();
+    el.innerHTML = `<h4>توضيح مبسّط للمعنى (مُولَّد آليًا — المعتمد هو النص الأصلي أعلاه):</h4>${esc(j.explanation || 'تعذر التبسيط الآن.')}`;
+  } catch (e) { el.textContent = 'تعذر التبسيط الآن.'; }
+}
+</script>
+<script src="/qibla.js"></script>
+</body>
+</html>
