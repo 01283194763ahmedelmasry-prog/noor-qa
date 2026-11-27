@@ -205,7 +205,7 @@ function maghaziOf(names) {
   const had = [];
   for (const [a, b] of ev.b) for (let n = a; n <= b; n++) { const id = 'bukhari:' + n; if (D.H[id]) had.push(pubH(id)); }
   const mus = ev.m.filter((n) => D.H['muslim:' + n]).map((n) => pubH('muslim:' + n));
-  return { name: ev.name, chron: !!ev.chron, note: ev.note || '', ayahs, bukhari: had, muslim: mus };
+  return { name: ev.name, chron: !!ev.chron, note: ev.note || '', lb: ev.lb || '', hb: ev.hb || '', hm: ev.hm || '', ayahs, bukhari: had, muslim: mus };
 }
 async function search(q) {
   const kw = await expandQuery(q);
